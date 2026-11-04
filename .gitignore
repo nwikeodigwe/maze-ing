@@ -1,0 +1,11 @@
+.idea/
+.venv/
+.mypy_cache/
+.ruff_cache/
+*.pyc
+data/saves/*
+data/user_state.json
+data/game.db
+.mailmap
+.env
+debug.py
