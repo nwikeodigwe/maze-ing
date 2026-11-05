@@ -12,6 +12,7 @@ dependencies = [
     "pytest-cov>=7.1.0",
     "python-dotenv>=1.2.4",
     "rich>=15.0.0",
+    "typer>=0.27.3",
 ]
 
 [tool.ruff]
@@ -31,6 +32,9 @@ addopts = [
     "--cov=src",
     "--cov=db",
     "--cov-report=term-missing",
+]
+filterwarnings = [
+    "ignore:_UnionGenericAlias is deprecated:DeprecationWarning",
 ]
 
 [tool.coverage.run]

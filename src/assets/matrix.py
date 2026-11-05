@@ -47,13 +47,13 @@ class Matrix(list):
     def __str__(self):
         text = ""
 
-        for (c, s, l) in sum(self[MAX_LEN:], []):
+        for (c, s, clr_idx) in sum(self[MAX_LEN:], []):
             if s == STATE_NONE:
                 text += BLANK_CHAR
             elif s == STATE_FRONT:
                 text += f"{FRONT_CLR}{c}"
             else:
-                text += f"{BODY_CLRS[l]}{c}"
+                text += f"{BODY_CLRS[clr_idx]}{c}"
 
         return text
 
@@ -122,9 +122,9 @@ class Matrix(list):
             if i == 0:
                 self.update_cell(r, col, state=STATE_FRONT, length=length)
             else:
-                l = math.ceil((TOTAL_CLRS - 1) * i / length)
+                clr_idx = math.ceil((TOTAL_CLRS - 1) * i / length)
 
-                self.update_cell(r, col, state=STATE_TAIL, length=l)
+                self.update_cell(r, col, state=STATE_TAIL, length=clr_idx)
 
     def screen_check(self):
         if (p := self.get_prompt_size()) != (self.rows, self.cols):
