@@ -5,6 +5,9 @@
 # Rich text formatting, colorized terminal output, and status spinners
 rich==15.0.0
 
+# Typer, build great CLIs. Easy to code. Based on Python type hints.
+typer==0.27.3
+
 
 # ==============================================================================
 # AI / LLM INTEGRATION (LangChain)
