@@ -71,9 +71,9 @@ class Matrix(list):
         r: int,
         c: int,
         *,
-        char: str = None,
-        state: int = None,
-        length: int = None,
+        char: str | None = None,
+        state: int | None = None,
+        length: int | None = None,
     ):
         if char is not None:
             self[r][c][0] = char
