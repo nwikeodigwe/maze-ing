@@ -3,6 +3,7 @@
 .mypy_cache/
 .ruff_cache/
 *.pyc
+.coverage/*
 data/saves/*
 data/user.json
 data/game.db
