@@ -1,4 +1,4 @@
-# ACS15 A-maze-ing-Delft ![Test Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/nwikeodigwe/dca3bffcba872b0a6c274ad5ca36e73d/raw/coverage.json)
+# ACS15 A-maze-ing-Delft ![Test Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fnwikeodigwe%2Fdca3bffcba872b0a6c274ad5ca36e73d%2Fraw%2Fcoverage.json)
 
 
 ## Description
