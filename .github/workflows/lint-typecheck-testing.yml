@@ -1,17 +1,22 @@
 name: A-maze-ing-Delft CI
-run-name: CI Linting, Type Check and Testing
-description: Automated code quality and testing pipeline that enforces formatting (Black), linting (Ruff), and static type safety (Mypy) and testing on main branch pushes and pull requests.
 
+run-name: CI lint, type check and tests for ${{ github.ref_name }} by @${{ github.actor }}
+
+# Automated quality pipeline: Ruff, Mypy, tests, and coverage badge updates.
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  quality:
+    name: Lint, type check and test
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -19,24 +24,22 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          cache: 'pip'
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install ruff mypy pytest
+          python -m pip install -r requirements.txt
 
       - name: Lint with Ruff
-        run: |
-          ruff check .
+        run: ruff check .
 
       - name: Type check with Mypy
-        run: |
-          mypy .
+        run: mypy .
 
-      - name: Testing with coverage
+      - name: Test with coverage
         run: |
           mkdir -p coverage
           pytest --cov-report=json:coverage/coverage-summary.json
@@ -44,11 +47,18 @@ jobs:
       - name: Extract coverage percentage
         id: coverage
         run: |
-          PERCENTAGE=$(jq -r '.total.lines.pct' coverage/coverage-summary.json)
-          echo "pct=$PERCENTAGE" >> $GITHUB_OUTPUT
+          PERCENTAGE=$(jq -r '.totals.percent_covered_display // empty' coverage/coverage-summary.json)
 
-      - name: Update Coverage Badge Gist
-        uses: schneegans/dynamic-badges-action@v1.7.0
+          if [ -z "$PERCENTAGE" ] || [ "$PERCENTAGE" = "null" ]; then
+            echo "::error::Coverage percentage missing from coverage-summary.json"
+            exit 1
+          fi
+
+          echo "pct=$PERCENTAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Update coverage badge gist
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: schneegans/dynamic-badges-action@v1.9.0
         with:
           auth: ${{ secrets.GIST_SECRET }}
           gistID: dca3bffcba872b0a6c274ad5ca36e73d
