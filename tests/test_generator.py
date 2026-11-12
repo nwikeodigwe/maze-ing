@@ -1,9 +1,9 @@
-"""Tests for ``src/utils/username_generator.py``."""
+"""Tests for ``src/utils/generator.py``."""
 
 from contextlib import contextmanager
 from unittest.mock import Mock
 
-import src.utils.username_generator as generator
+import src.utils.generator as generator
 
 
 def _fake_connection(fetchone_results):

@@ -1,103 +1,101 @@
-"""Per-phase prompt cycles for the game loop.
+from enum import Enum
 
-``run()`` in :mod:`src.engine` calls exactly one of :func:`exploration`, :func:`assembly` or :func:`chat` per loop
-iteration depending on ``state["game_state"]["phase"]`` (``EXPLORATION`` -> ``ASSEMBLY`` -> ``CHAT``). Each function
-reads one line, parses it, clears the screen and dispatches the command; invalid input re-renders with an error.
-
-Attributes:
-    LAST_ROOM_ID: Unused placeholder kept for compatibility.
-"""
-
-from .utils.chat import respond
-from .display import clear, header, out, colorize
-from .engine import  prompt, commands
-from .parser import parse
-from .room import render
-from .state import state
-from .utils.colors import BRIGHT_GREEN, BRIGHT_RED, RED
-from .rooms.lab_d2_001 import activate, workbench
-
-LAST_ROOM_ID: str | None = None
-
-def exploration() -> None:
-    """Run one exploration prompt cycle.
-
-    Reads a command, dispatches it, and prints an error for ``UNKNOWN``/``INVALID``/``EMPTY`` verbs. The caller
-    (:func:`src.engine.run`) owns the loop.
-    """
-    raw = prompt()
-    verb, details = parse(raw)
-    clear()
-    commands(verb, details)
-    if verb in ("UNKNOWN", "INVALID", "EMPTY"):
-        render(
-            colorize(text="Invalid input. Please try again. type 'help' for a list of available commands.",
-                     color_code=BRIGHT_RED
-                     )
-            )
-    return
+from src.langchain import Langchain
+from src.parser import Parser
+from src.room import Room
+from src.utils.display import clear, prompt
+from src.utils.colors import Colors
 
 
-def assembly() -> None:
-    """Run one assembly-phase cycle.
+class Mode(str, Enum):
+    EXPLORATION = "EXPLORATION"
+    ASSEMBLY = "ASSEMBLY"
+    CHAT = "CHAT"
 
-    On the first call after the phase starts it shows the workbench and sets ``activated`` instead of prompting. On
-    later calls it reads a command, dispatches it, handles ``activate`` (which may switch the phase to ``CHAT``) and
-    prints an error for unknown input.
-    """
-    # First assembly tick only shows the workbench intro; the prompt starts on the next loop iteration.
-    if not state["game_state"]["phases"]["assembly"]["activated"]:
+
+class Phase(Room):
+    def __init__(self, mode: Mode = Mode.EXPLORATION, color: Colors | None = None) -> None:
+        super().__init__()
+        self.last_room_id: str | None = None
+        self.mode: Mode = mode
+        self.parser = Parser()
+        self.langchain = Langchain(provider="gemini")
+        self.color: Colors = color or Colors()
+
+    def exploration(self) -> None:
+        """Run one exploration prompt cycle."""
+        raw = prompt()
+        verb, details = self.parser.parse(raw)
         clear()
-        workbench(
-            colorize(
-                "Build your dream robot. type 'activate' to begin activation",
-                BRIGHT_GREEN
+        self.commands(verb, details)
+        if verb in ("UNKNOWN", "INVALID", "EMPTY"):
+            self.render(
+                self.colorize(
+                    text="Invalid input. Please try again. type 'help' for a list of available commands.",
+                    color_code=self.color.ERROR,
                 )
-        )
-        state["game_state"]["phases"]["assembly"]["activated"] = True
+            )
         return
-    raw = prompt()
-    verb, details = parse(raw)
-    clear()
-    commands(verb, details)
-    if verb == "activate":
-        activate()
-    if verb in ("UNKNOWN", "INVALID", "EMPTY"):
-        render(colorize("Invalid input. Please try again. type 'help' for a list of available commands.", RED))
-    return
 
-def chat() -> None:
-    """Run one chat-phase cycle.
-
-    The first call prints a welcome message and sets ``activated``. After that, a command is dispatched normally; text
-    that is not a command is sent to the robot via :func:`src.utils.chat.respond` when the player is in ``lab_d2_001``
-    and reported as invalid elsewhere.
-    """
-    if not state["game_state"]["phases"]["chat"]["activated"]:
+    def assembly(self) -> None:
+        """Run one assembly-phase cycle."""
+        if not self.session["phases"]["assembly"]["activated"]:
+            clear()
+            self.render_workbench(
+                self.colorize(
+                    "Build your dream robot. type 'activate' to begin activation",
+                    self.color.SUCCESS,
+                )
+            )
+            self.session["phases"]["assembly"]["activated"] = True
+            return
+        raw = prompt()
+        verb, details = self.parser.parse(raw)
         clear()
-        render(
-            colorize(f"Welcome to A-maze-ing-Delft chat mode! You can now freely talk to "
-                     f"{state['game_state']['phases']['chat']['robot']['name']}", BRIGHT_GREEN)
-        )
-        state["game_state"]["phases"]["chat"]["activated"] = True
+        self.commands(verb, details)
+        if verb == "activate":
+            self.activate()
+        if verb in ("UNKNOWN", "INVALID", "EMPTY"):
+            self.render(
+                self.colorize(
+                    "Invalid input. Please try again. type 'help' for a list of available commands.",
+                    self.color.ERROR,
+                )
+            )
         return
-    raw = prompt()
-    verb, details = parse(raw)
-    clear()
-    commands(verb, details)
-    # In the lab, anything that is not a game command is treated as chat with the robot.
-    if verb in ("UNKNOWN", "INVALID", "EMPTY") and state["player"]["current_room"] == "lab_d2_001":
-        header()
-        out()
-        respond(raw)
-        out()
-        return
-    if verb in ("UNKNOWN", "INVALID", "EMPTY"):
-        render(
-            colorize(
-                "Invalid input. Please try again. type 'help' for a list of available commands.",
-                RED
+
+    def chat(self) -> None:
+        """Run one chat-phase cycle."""
+        if not self.session["phases"]["chat"]["activated"]:
+            clear()
+            self.render(
+                self.colorize(
+                    f"Welcome to A-maze-ing-Delft chat mode! You can now freely talk to "
+                    f"{self.session['phases']['chat']['robot']['name']}",
+                    self.color.SUCCESS,
+                )
+            )
+            self.session["phases"]["chat"]["activated"] = True
+            return
+        raw = prompt()
+        verb, details = self.parser.parse(raw)
+        clear()
+        self.commands(verb, details)
+        if (
+            verb in ("UNKNOWN", "INVALID", "EMPTY")
+            and self.player["current_room"] == "lab_d2_001"
+        ):
+            self.header()
+            self.out()
+            self.langchain.respond(raw)
+            self.out()
+            return
+        if verb in ("UNKNOWN", "INVALID", "EMPTY"):
+            self.render(
+                self.colorize(
+                    "Invalid input. Please try again. type 'help' for a list of available commands.",
+                    self.color.ERROR,
                 )
             )
 
-    return
+        return

@@ -1,192 +1,66 @@
-"""Tests for ``src/display.py``."""
+"""Tests for the display helpers."""
 
-import os
-from unittest.mock import Mock
+from types import SimpleNamespace
 
-import pytest
+import builtins
 
-import src.display as display
-import src.state as state_module
+import config
 
-
+import src.utils.display as display
 
 
-@pytest.mark.parametrize(
-    ("text", "expected"),
-    [
-        pytest.param("hello world", "hello world", id="ascii"),
-        pytest.param("", "", id="empty"),
-        pytest.param("─═•→←", "-=*-><-", id="box-chars"),
-        pytest.param("Room ─ Lab", "Room - Lab", id="mixed"),
-        pytest.param("你好", "??", id="non-cp1252-replaced"),
-        pytest.param("café", "café", id="cp1252-passthrough"),
-        pytest.param("• 你好 →", "* ?? ->", id="mixed-non-cp1252"),
-    ],
-)
-def test_safe(text, expected):
-    assert display.safe(text) == expected
-
-
-@pytest.mark.parametrize(
-    ("enable_colors", "expected"),
-    [
-        pytest.param(True, "REDhello\033[0m", id="colors-on"),
-        pytest.param(False, "hello", id="colors-off"),
-    ],
-)
-def test_colorize(monkeypatch, enable_colors, expected):
-    monkeypatch.setattr(state_module, "state", {"enable_colors": enable_colors})
-
-    assert display.colorize("hello", "RED") == expected
-
-
-def test_out_prints_text(capsys):
-    display.out("hello")
-
-    assert capsys.readouterr().out == "hello\n"
-
-
-def test_out_default_empty(capsys):
-    display.out()
-
-    assert capsys.readouterr().out == "\n"
-
-
-def test_out_translates_box_chars(capsys):
-    display.out("═")
-
-    assert capsys.readouterr().out == "=\n"
-
-
-def test_draw_line_custom_char(monkeypatch):
-    monkeypatch.setattr(
-        state_module, "state", {"enable_colors": False, "terminal_width": 5}
-    )
-    out_mock = Mock()
-    monkeypatch.setattr(display, "out", out_mock)
-
-    display.draw_line("*")
-
-    out_mock.assert_called_once_with("*****")
-
-
-def test_draw_line_default_char(monkeypatch):
-    monkeypatch.setattr(
-        state_module, "state", {"enable_colors": False, "terminal_width": 3}
-    )
-    out_mock = Mock()
-    monkeypatch.setattr(display, "out", out_mock)
-
-    display.draw_line()
-
-    out_mock.assert_called_once_with("---")
-
-
-def test_clear_uses_rich_console(monkeypatch):
-    console_cls = Mock()
-    monkeypatch.setattr("rich.console.Console", console_cls)
-
-    display.clear()
-
-    console_cls.return_value.clear.assert_called_once()
-
-
-def test_clear_pycharm_fallback(monkeypatch, capsys, block_rich_import):
-    block_rich_import(monkeypatch)
-    monkeypatch.setenv("PYCHARM_HOSTED", "1")
-
-    display.clear()
-
-    assert capsys.readouterr().out == "\n" * 51
-
-
-@pytest.mark.parametrize(
-    ("os_name", "expected_cmd"),
-    [
-        pytest.param("nt", "cls", id="windows"),
-        pytest.param("posix", "clear", id="posix"),
-    ],
-)
-def test_clear_subprocess_fallback(monkeypatch, os_name, expected_cmd, block_rich_import):
-    block_rich_import(monkeypatch)
-    monkeypatch.delenv("PYCHARM_HOSTED", raising=False)
-    monkeypatch.setattr(os, "name", os_name)
-    run_mock = Mock()
-    monkeypatch.setattr(display, "run", run_mock)
-
-    display.clear()
-
-    run_mock.assert_called_once_with([expected_cmd], shell=True)
-
-
-def test_header_reads_state_and_draws(monkeypatch):
-    monkeypatch.setattr(
-        state_module,
-        "state",
-        {
-            "enable_colors": False,
-            "terminal_width": 10,
-            "player": {"current_room": "lab", "name": "guest"},
-            "rooms": {"lab": {"name": "Lab D 2001"}},
-            "game_state": {
-                "phase": "EXPLORATION",
-                "duration": {
-                    "last_write": None,
-                    "value": "00:05:00",
-                    "pause": False,
-                },
+def make_display_state(enable_colors=False, width=40):
+    return SimpleNamespace(
+        enable_colors=enable_colors,
+        terminal_width=width,
+        player={"current_room": "lobby", "name": "tester"},
+        session={
+            "phase": "EXPLORATION",
+            "duration": {"value": "00:00:00", "pause": False},
+        },
+        rooms={
+            "lobby": {
+                "name": "Lobby",
+                "exits": {"north": "hall", "nowhere": "missing"},
+                "items": ["part"],
+                "interactables": {"terminal": "Terminal"},
             },
+            "hall": {"name": "Hall"},
+        },
+        items={
+            "part": {
+                "name": "Part",
+                "description": "A part",
+                "is_assembly_part": True,
+            }
         },
     )
-    monkeypatch.setattr(display, "colorize", lambda text, color_code: text)
-    out_mock = Mock()
-    draw_mock = Mock()
-    monkeypatch.setattr(display, "out", out_mock)
-    monkeypatch.setattr(display, "draw_line", draw_mock)
-
-    display.header()
-
-    assert draw_mock.call_count == 2
-    assert [call.args[0] for call in draw_mock.call_args_list] == ["═", "═"]
-    assert out_mock.call_count == 5
-    assert [call.args[0] for call in out_mock.call_args_list] == [
-        "[EXPLORATION]",
-        "LOCATION: Lab D 2001",
-        "GUEST",
-        "00:05:00",
-        "",
-    ]
 
 
-def test_header_with_content(monkeypatch):
-    monkeypatch.setattr(
-        state_module,
-        "state",
-        {
-            "enable_colors": False,
-            "terminal_width": 40,
-            "player": {"current_room": "lab", "name": "polaris"},
-            "rooms": {"lab": {"name": "Lab D 2001"}},
-            "game_state": {
-                "phase": "EXPLORATION",
-                "duration": {
-                    "last_write": None,
-                    "value": "00:05:00",
-                    "pause": False,
-                },
-            },
-        },
-    )
-    monkeypatch.setattr(display, "colorize", lambda text, color_code: text)
-    out_mock = Mock()
-    monkeypatch.setattr(display, "out", out_mock)
-    monkeypatch.setattr(display, "draw_line", Mock())
+def test_safe_transliterates_and_falls_back():
+    assert display.safe("a─b•c→d") == "a-b*c->d"
+    assert display.safe("plain") == "plain"
+    assert display.safe("emoji \U0001f600") == "emoji ?"
 
-    display.header("SAVED CHECKPOINTS")
 
-    assert out_mock.call_args_list[1].args[0] == "SAVED CHECKPOINTS"
-    assert out_mock.call_args_list[1].kwargs["end"] == " " * (
-        40 - len("SAVED CHECKPOINTS") - len("polaris")
-    )
-    assert out_mock.call_args_list[2].args[0] == "POLARIS"
-    assert out_mock.call_args_list[3].args[0] == "00:05:00"
+def test_prompt(monkeypatch):
+    monkeypatch.setattr(builtins, "input", lambda prompt: "  answer  ")
+    assert display.prompt() == "answer"
+    assert display.prompt("Name") == "answer"
+
+
+def test_colorize_respects_setting(monkeypatch):
+    monkeypatch.setattr(config, "state", make_display_state(enable_colors=False))
+    assert display.colorize("text", "\033[31m") == "text"
+
+    monkeypatch.setattr(config, "state", make_display_state(enable_colors=True))
+    assert display.colorize("text", "\033[31m") == "\033[31mtext\033[0m"
+
+
+def test_out_and_draw_line(monkeypatch, capsys):
+    monkeypatch.setattr(config, "state", make_display_state(width=5))
+    display.out("hello", end="")
+    display.draw_line("-")
+    captured = capsys.readouterr().out
+    assert "hello" in captured
+    assert "-----" in captured

@@ -37,6 +37,7 @@ TOTAL_CLRS = len(BODY_CLRS)
 
 class Matrix(list):
     def __init__(self, wait: int, glitch_freq: int, drop_freq: int):
+        super().__init__()
         self.rows = 0
         self.cols = 0
 
@@ -179,3 +180,4 @@ def start(
     matrix.start()
 
 
+app()
