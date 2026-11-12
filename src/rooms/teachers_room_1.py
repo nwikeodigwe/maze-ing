@@ -1,68 +1,71 @@
 """Teachers Room 1: the keypad desk that holds the Level-1 staff keycard."""
-
-from ..display import colorize
-from ..room import render
-from ..utils.colors import RED, GREEN, BRIGHT_GREEN
-from ..state import state
+from src.room import Room
+from src.utils.colors import Colors
 
 
-def use_desk_code(item: str, target: str | None = None) -> None:
-    """Try ``item`` as the desk code.
+class TeachersRoomOne(Room):
+    def __init__(self, color: Colors | None = None) -> None:
+        super().__init__()
+        self.color: Colors = color or Colors()
 
-    A correct code sets the ``tr1_desk_unlocked`` flag and, if not already held, gives the player the desk's reward
-    item. The stored code is compared lower-cased because parser input is already lower-case. Results are rendered,
-    not returned.
+    def use_desk_code(self, item: str, target: str | None = None) -> None:
+        """Try ``item`` as the desk code.
 
-    Args:
-        item: The code the player typed (the ``use`` target).
-        target: What the code is used on; anything other than ``None`` or ``"desk"`` does nothing.
-    """
-    desk = state["rooms"]["teachers_room_1"]["interactables"]["desk"]
-    desk_code = desk["code"]
-    flags = state["flags"]
+        A correct code sets the ``tr1_desk_unlocked`` flag and, if not already
+        held, gives the player the desk's reward item. Results are rendered,
+        not returned.
+        """
+        desk = self.rooms["teachers_room_1"]["interactables"]["desk"]
+        desk_code = desk["code"]
 
-
-    if target is not None and target != "desk":
-        render(text=colorize("Nothings happens", color_code=RED))
-        return None
-
-
-    if flags["tr1_desk_unlocked"]:
-        render(text=colorize("The desk is already unlocked.", color_code=GREEN))
-        return None
-
-    if item == desk_code.lower():
-        flags["tr1_desk_unlocked"] = True
-        reward = desk["reward"]
-        if reward not in state["player"]["inventory"]:
-            state["player"]["inventory"].append(reward)
-            render(text=colorize("Keypad clicks green. You've obtained the Level-1 Staff Keycard.", color_code=GREEN))
+        if target is not None and target != "desk":
+            self.render(text=self.colorize("Nothings happens", color_code=self.color.RED))
             return None
-        render(
-            text=colorize(
-                "You already have a Level-1 Staff keycard.",
-                color_code=GREEN
+
+        if self.flags["tr1_desk_unlocked"]:
+            self.render(
+                text=self.colorize("The desk is already unlocked.", color_code=self.color.GREEN)
+            )
+            return None
+
+        if item == desk_code.lower():
+            self.flags["tr1_desk_unlocked"] = True
+            reward = desk["reward"]
+            if reward not in self.player["inventory"]:
+                self.player["inventory"].append(reward)
+                self.render(
+                    text=self.colorize(
+                        "Keypad clicks green. You've obtained the Level-1 Staff Keycard.",
+                        color_code=self.color.GREEN,
+                    )
+                )
+                return None
+            self.render(
+                text=self.colorize(
+                    "You already have a Level-1 Staff keycard.",
+                    color_code=self.color.GREEN,
                 )
             )
-        return None
-    render(
-        text=colorize(
-            f"Keypad buzzes red: Incorrect code entered.: {item}",
-            color_code=RED
-        )
-    )
-    return None
+            return None
 
-def inspect_desk() -> None:
-    if not state["flags"]["tr1_desk_unlocked"]:
-
-        render(
-            text=state["rooms"]["teachers_room_1"]["interactables"]["desk"]["hint"]
-        )
-        return None
-    render(
-        text=colorize(
-            "The desk drawer is open. You already took the keycard.", BRIGHT_GREEN
+        self.render(
+            text=self.colorize(
+                f"Keypad buzzes red: Incorrect code entered.: {item}",
+                color_code=self.color.RED,
             )
-    )
-    return None
+        )
+        return None
+
+    def inspect_desk(self) -> None:
+        if not self.flags["tr1_desk_unlocked"]:
+            self.render(
+                text=self.rooms["teachers_room_1"]["interactables"]["desk"]["hint"]
+            )
+            return None
+        self.render(
+            text=self.colorize(
+                "The desk drawer is open. You already took the keycard.",
+                self.color.SUCCESS,
+            )
+        )
+        return None

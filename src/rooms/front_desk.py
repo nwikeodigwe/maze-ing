@@ -1,7 +1,8 @@
-from src.room import render
-from src.state import state
+from src.room import Room
 
-def inspect_receptionist():
-    receptionist = state["rooms"]["front_desk"]["interactables"]["receptionist"]
-    render(text=receptionist)
-    return None
+
+class FrontDesk(Room):
+    def inspect_receptionist(self):
+        receptionist = self.rooms["front_desk"]["interactables"]["receptionist"]
+        self.render(text=receptionist)
+        return None

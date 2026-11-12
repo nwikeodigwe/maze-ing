@@ -1,14 +1,10 @@
-"""Teachers Room 2.
-
-No room-specific logic is needed: its data lives in ``data/default_state.json`` and the ``whiteboard`` interaction
-is handled by :func:`src.engine.inspect`.
-"""
-from src.room import render
-from src.state import state
+"""Teachers Room 2."""
+from src.room import Room
 
 
-def inspect_whiteboard() -> None:
-    state["flags"]["tr2_whiteboard_inspected"] = True
-    whiteboard = state["rooms"]["teachers_room_2"]["interactables"]["whiteboard"]
-    render(text=whiteboard)
-    return None
+class TeachersRoomTwo(Room):
+    def inspect_whiteboard(self) -> None:
+        self.flags["tr2_whiteboard_inspected"] = True
+        whiteboard = self.rooms["teachers_room_2"]["interactables"]["whiteboard"]
+        self.render(text=whiteboard)
+        return None

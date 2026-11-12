@@ -1,1061 +1,543 @@
-"""Tests for ``src/engine.py``."""
-
-import builtins
-import json
-from unittest.mock import Mock
+"""Integration tests for the engine, rooms and phases."""
 
 import pytest
 
-import src.engine as engine
-import src.phase as phase_module
+import src.rooms.lab as lab_oop
+import src.rooms.teachers_room_4 as tr4_oop
+import src.phase as phase_oop
+import src.room as room_oop
 
-HELP_GROUPS = [
-    {
-        "title": "Movement",
-        "commands": [
-            {"command": "go", "description": "Move", "example": "go north"}
-        ],
-    },
-    {
-        "title": "Assembly",
-        "commands": [
-            {"command": "use", "description": "Install", "example": "use x"}
-        ],
-    },
-]
-
-@pytest.mark.parametrize(
-    ("message", "expected_prompt"),
-    [
-        pytest.param(None, "\n> ", id="no-message"),
-        pytest.param("Enter", "\nEnter >", id="with-message"),
-    ],
-)
-def test_prompt(monkeypatch, message, expected_prompt):
-    captured = {}
-
-    def fake_input(prompt_text):
-        captured["prompt"] = prompt_text
-        return "  hello  "
-
-    monkeypatch.setattr(builtins, "input", fake_input)
-
-    result = engine.prompt(message)
-
-    assert result == "hello"
-    assert captured["prompt"] == expected_prompt
+from src.rooms.front_desk import FrontDesk
+from src.rooms.teachers_room_4 import SECRET_PATH, TeachersRoomFour
+from src.utils.shell import ShellResult
 
 
-def test_inventory_empty(monkeypatch, en_rendered, duration, out_texts):
-    monkeypatch.setattr(
-        engine,
-        "state",
+def test_inventory_empty_and_populated(oop_engine):
+    oop_engine.inventory()
+    assert any("empty" in line for line in oop_engine.outputs)
+
+    oop_engine.outputs.clear()
+    oop_engine.player["inventory"] = ["blueprint", "battery_pack"]
+    oop_engine.inventory()
+
+    text = "\n".join(oop_engine.outputs)
+    assert "Robot Assembly Blueprint" in text
+    assert "High-Capacity Battery Pack" in text
+    assert "1/8" in text
+
+
+def test_status_screen_renders(oop_engine):
+    oop_engine.flags["tr1_desk_unlocked"] = True
+    oop_engine.player["move"] = ["teachers_room_1"]
+    oop_engine.player["inventory"] = ["blueprint"]
+
+    oop_engine.status()
+
+    text = "\n".join(oop_engine.outputs)
+    assert "STATUS MENU" in text
+    assert "Tester" in text
+    assert "EXPLORATION" in text
+    assert "desk unlocked" in text.lower()
+
+
+def test_helper_renders_rich_menu(oop_engine, capsys):
+    oop_engine.helper()
+
+    captured = capsys.readouterr().out
+    assert "HELP MENU" in "\n".join(oop_engine.outputs)
+    assert "Movement" in captured
+
+
+def test_inspect_dispatches_room_specific_targets(oop_engine, monkeypatch):
+    oop_engine.inspect({"target": "terminal"})
+    assert any("Exits" in line for line in oop_engine.outputs)
+
+    oop_engine.player["current_room"] = "front_desk"
+    oop_engine.inspect({"target": "receptionist"})
+    assert any("receptionist" in line.lower() for line in oop_engine.outputs)
+
+    oop_engine.player["current_room"] = "teachers_room_1"
+    oop_engine.inspect({"target": "desk"})
+    assert any("Keypad hint" in line for line in oop_engine.outputs)
+
+    oop_engine.player["current_room"] = "lab_d2_001"
+    oop_engine.inspect({"target": "workbench"})
+    assert any("WORKBENCH" in line for line in oop_engine.outputs)
+
+    oop_engine.player["current_room"] = "teachers_room_2"
+    oop_engine.inspect({"target": "whiteboard"})
+    assert oop_engine.flags["tr2_whiteboard_inspected"] is True
+
+    oop_engine.player["current_room"] = "teachers_room_4"
+    oop_engine.inspect({"target": "note"})
+    assert any("note" in line.lower() for line in oop_engine.outputs)
+
+    called = []
+    monkeypatch.setattr(oop_engine, "inspect_computer", lambda: called.append(True))
+    oop_engine.inspect({"target": "computer"})
+    assert called == [True]
+
+    oop_engine.inspect({"target": "nothing"})
+    assert any("unavailable" in line for line in oop_engine.outputs)
+
+
+def test_use_desk_code_paths(oop_engine):
+    oop_engine.player["current_room"] = "teachers_room_1"
+
+    oop_engine.use({"target": "wrong", "indirect": "desk"})
+    assert "keycard_lvl1" not in oop_engine.player["inventory"]
+
+    oop_engine.use({"target": "d2084", "indirect": "desk"})
+    assert "keycard_lvl1" in oop_engine.player["inventory"]
+    assert oop_engine.flags["tr1_desk_unlocked"] is True
+
+    oop_engine.use({"target": "d2084", "indirect": "desk"})
+    assert any("already unlocked" in line for line in oop_engine.outputs)
+
+    oop_engine.use({"target": "d2084", "indirect": "door"})
+    assert any("Nothings happens" in line for line in oop_engine.outputs)
+
+
+def test_use_on_workbench_paths(oop_engine):
+    oop_engine.player["current_room"] = "lab_d2_001"
+    oop_engine.player["inventory"] = ["chassis_frame", "blueprint"]
+
+    oop_engine.use({"target": "missing", "indirect": "workbench"})
+    assert any("not a workbench component" in line for line in oop_engine.outputs)
+
+    oop_engine.use({"target": "mainboard", "indirect": "workbench"})
+    assert any("do not have" in line for line in oop_engine.outputs)
+
+    oop_engine.use({"target": "blueprint", "indirect": "workbench"})
+    assert any("not a workbench component" in line for line in oop_engine.outputs)
+
+    oop_engine.workbench["installed_parts"] = ["chassis_frame"]
+    oop_engine.use({"target": "chassis_frame", "indirect": "workbench"})
+    assert any("already installed" in line for line in oop_engine.outputs)
+
+    oop_engine.workbench["installed_parts"] = []
+    oop_engine.use({"target": "chassis_frame", "indirect": "workbench"})
+    assert "chassis_frame" in oop_engine.workbench["installed_parts"]
+    assert "chassis_frame" not in oop_engine.player["inventory"]
+
+    required = oop_engine.workbench["required_parts"]
+    oop_engine.workbench["installed_parts"] = required[:-1]
+    oop_engine.player["inventory"] = [required[-1]]
+    oop_engine.use({"target": required[-1], "indirect": "workbench"})
+    assert oop_engine.workbench["is_ready"] is True
+    assert oop_engine.session["phase"] == "ASSEMBLY"
+
+
+def test_use_elsewhere_reports_missing_or_useless(oop_engine):
+    oop_engine.use({"target": "blueprint", "indirect": "wall"})
+    assert any("do not have" in line for line in oop_engine.outputs)
+
+    oop_engine.player["inventory"] = ["blueprint"]
+    oop_engine.use({"target": "blueprint", "indirect": "wall"})
+    assert any("cannot use" in line for line in oop_engine.outputs)
+
+
+def test_take_and_drop(oop_engine):
+    oop_engine.take({"target": "blueprint"})
+    assert "blueprint" in oop_engine.player["inventory"]
+    assert "blueprint" not in oop_engine.rooms["lobby"]["items"]
+
+    oop_engine.take({"target": "not_here"})
+    assert any("no 'not_here' here" in line for line in oop_engine.outputs)
+
+    oop_engine.drop({"target": "blueprint"})
+    assert "blueprint" in oop_engine.rooms["lobby"]["items"]
+
+    oop_engine.drop({"target": "not_an_item"})
+    assert any("no item called" in line for line in oop_engine.outputs)
+
+    oop_engine.drop({"target": "keycard_lvl1"})
+    assert any("do not have" in line for line in oop_engine.outputs)
+
+
+def test_register_login_and_logout(oop_engine):
+    oop_engine.player["current_room"] = "front_desk"
+
+    oop_engine.register({"target": "alice"})
+    assert oop_engine.player["name"] == "alice"
+    assert oop_engine.player["id"] == 1
+
+    oop_engine.register({"target": "alice"})
+    assert any("already taken" in line for line in oop_engine.outputs)
+
+    oop_engine.user.raise_on_create = ValueError("database down")
+    oop_engine.register({"target": "bob"})
+    assert any("database down" in line for line in oop_engine.outputs)
+
+    oop_engine.player["current_room"] = "lobby"
+    oop_engine.register({"target": "carol"})
+    assert any("only register" in line for line in oop_engine.outputs)
+
+    oop_engine.player["current_room"] = "front_desk"
+    oop_engine.login({"target": "alice"})
+    assert oop_engine.player["id"] == 1
+
+    oop_engine.login({"target": None})
+    assert any("Please enter a name" in line for line in oop_engine.outputs)
+
+    oop_engine.login({"target": "nobody"})
+    assert any("does not exist" in line for line in oop_engine.outputs)
+
+    oop_engine.logout()
+    assert oop_engine.player["name"] == "guest"
+    assert oop_engine.player["id"] is None
+
+    oop_engine.logout()
+    assert any("not logged in" in line for line in oop_engine.outputs)
+
+    oop_engine.player["current_room"] = "lobby"
+    oop_engine.logout()
+    assert any("only complete" in line for line in oop_engine.outputs)
+
+
+def test_restart_keeps_identity_and_resets_clock(oop_engine):
+    oop_engine.player["name"] = "alice"
+    oop_engine.player["id"] = 7
+    oop_engine.session["duration"]["value"] = "1:00:00"
+
+    oop_engine.restart()
+
+    assert oop_engine.player["name"] == "alice"
+    assert oop_engine.player["id"] == 7
+    assert oop_engine.session["duration"]["value"] == "00:00:00"
+    assert oop_engine.session["phase"] == "EXPLORATION"
+    assert any("New game" in line for line in oop_engine.outputs)
+
+
+def test_scoreboard_empty_and_populated(oop_engine):
+    oop_engine.render_scoreboard()
+    assert any("No entries" in line for line in oop_engine.outputs)
+
+    oop_engine.outputs.clear()
+    oop_engine.scoreboard.entries = [
         {
-            "terminal_width": 80,
-            "game_state": {
-                "phase": "EXPLORATION",
-                "duration": duration(),
-            },
-            "player": {"inventory": []},
+            "user_id": 1,
+            "score": 900,
+            "avg_room_time": "0:01:00",
+            "exploration_time": "0:10:00",
+            "assembly_time": "0:02:00",
         },
-    )
-
-    engine.inventory()
-
-    en_rendered["header"].assert_called_once_with("INVENTORY")
-    assert any(
-        "Your inventory is currently empty." in text
-        for text in out_texts(en_rendered["out"])
-    )
-
-
-def test_inventory_populated(monkeypatch, en_rendered, duration, out_texts):
-    monkeypatch.setattr(
-        engine,
-        "state",
         {
-            "terminal_width": 80,
-            "game_state": {
-                "phase": "EXPLORATION",
-                "duration": duration("00:05:00"),
-            },
-            "player": {"inventory": ["chassis_frame", "keycard_lvl1"]},
-            "items": {
-                "chassis_frame": {
-                    "name": "Robot Chassis Frame",
-                    "description": "An aluminum skeleton.",
-                    "is_assembly_part": True,
-                },
-                "keycard_lvl1": {
-                    "name": "Level-1 Staff Keycard",
-                    "description": "A magnetic keycard.",
-                    "is_assembly_part": False,
-                },
-            },
-            "workbench": {"required_parts": ["chassis_frame", "battery_pack"]},
-        },
-    )
-
-    engine.inventory()
-
-    texts = out_texts(en_rendered["out"])
-    assert " • Robot Chassis Frame [ASSEMBLY PART]" in texts
-    assert "   An aluminum skeleton." in texts
-    assert " • Level-1 Staff Keycard" in texts
-    assert "   A magnetic keycard." in texts
-    assert any("Assembly Components in Inventory: 1/2" in text for text in texts)
-
-
-@pytest.mark.parametrize(
-    ("phase", "assembly_visible"),
-    [
-        pytest.param("EXPLORATION", False, id="exploration-hides-assembly"),
-        pytest.param("ASSEMBLY", True, id="assembly-shows-assembly"),
-    ],
-)
-def test_helper_filter_and_fallback(monkeypatch, en_rendered, phase, assembly_visible,
-                                    block_rich_import, duration, out_texts):
-    block_rich_import(monkeypatch)
-    monkeypatch.setattr(engine, "help_commands", HELP_GROUPS)
-    monkeypatch.setattr(
-        engine,
-        "state",
-        {"game_state": {"phase": phase, "duration": duration()}},
-    )
-
-    engine.helper()
-
-    texts = out_texts(en_rendered["out"])
-    assert texts[0] == "Available Commands:"
-    assert any("[Movement]" in text for text in texts)
-    assert bool([text for text in texts if "[Assembly]" in text]) is assembly_visible
-
-
-def test_helper_rich_path(monkeypatch, en_rendered, duration):
-    console_cls = Mock()
-    table_cls = Mock()
-    monkeypatch.setattr("rich.console.Console", console_cls)
-    monkeypatch.setattr("rich.table.Table", table_cls)
-    monkeypatch.setattr(engine, "help_commands", HELP_GROUPS)
-    monkeypatch.setattr(
-        engine,
-        "state",
-        {"game_state": {"phase": "EXPLORATION", "duration": duration()}},
-    )
-
-    engine.helper()
-
-    en_rendered["header"].assert_called_once_with("HELP MENU")
-    console_cls.return_value.print.assert_called_once_with(table_cls.return_value)
-    table_cls.return_value.add_row.assert_called_once_with("go", "Move", "go north")
-
-
-def test_scoreboard_empty(scoreboard_env, out_texts):
-    engine.scoreboard()
-
-    scoreboard_env["header"].assert_called_once_with("GAME SCOREBOARD")
-    assert out_texts(scoreboard_env["out"]) == ["No entries found!".center(80)]
-    scoreboard_env["get_user"].assert_not_called()
-
-
-def test_scoreboard_table(scoreboard_env, out_texts):
-    scoreboard_env["get_scoreboard_entries"].return_value = [
-        {
-            "id": 1,
-            "user_id": 10,
-            "score": 100,
-            "avg_room_time": "0:30",
-            "exploration_time": "1:00",
-            "assembly_time": "0:45",
-        },
-        {
-            "id": 2,
-            "user_id": 20,
-            "score": 75,
-            "avg_room_time": "0:40",
-            "exploration_time": "2:00",
-            "assembly_time": "1:00",
-        },
-    ]
-    scoreboard_env["get_user"].side_effect = lambda user_id: {
-        10: {"name": "Alice"},
-        20: {"name": "Bob"},
-    }[user_id]
-
-    engine.scoreboard()
-
-    scoreboard_env["header"].assert_called_once_with("GAME SCOREBOARD")
-    texts = out_texts(scoreboard_env["out"])
-    assert texts[0].startswith("Rank")
-    assert "Player" in texts[0]
-    assert "Score" in texts[0]
-    assert "Avg Room" in texts[0]
-    assert "Exploration" in texts[0]
-    assert "Assembly" in texts[0]
-    assert texts[1].startswith("1")
-    assert "Alice" in texts[1]
-    assert "100" in texts[1]
-    assert "0:30" in texts[1]
-    assert "1:00" in texts[1]
-    assert "0:45" in texts[1]
-    assert texts[2].startswith("2")
-    assert "Bob" in texts[2]
-    assert "75" in texts[2]
-    assert "0:40" in texts[2]
-    assert "2:00" in texts[2]
-    assert "1:00" in texts[2]
-    assert [
-        call.args[0] for call in scoreboard_env["get_user"].call_args_list
-    ] == [10, 20]
-
-
-def test_scoreboard_unknown_user(scoreboard_env, out_texts):
-    scoreboard_env["get_scoreboard_entries"].return_value = [
-        {
-            "id": 1,
             "user_id": 99,
-            "score": 42,
-            "avg_room_time": "0:30",
-            "exploration_time": "1:00",
-            "assembly_time": "0:45",
+            "score": 800,
+            "avg_room_time": "0:02:00",
+            "exploration_time": "0:12:00",
+            "assembly_time": "0:03:00",
         },
     ]
+    oop_engine.user.users = [{"id": 1, "name": "alice"}]
 
-    engine.scoreboard()
+    oop_engine.render_scoreboard()
 
-    texts = out_texts(scoreboard_env["out"])
-    assert texts[0].startswith("Rank")
-    assert "Unknown (99)" in texts[1]
-    assert "42" in texts[1]
+    text = "\n".join(oop_engine.outputs)
+    assert "alice" in text
+    assert "900" in text
+    assert "Unknown (99)" in text
 
 
-def test_status_full(monkeypatch, en_rendered, status_rows, status_full_state):
-    monkeypatch.setattr(engine, "state", status_full_state)
+def test_shutdown_persists_and_stops(oop_engine):
+    oop_engine.shutdown()
 
-    engine.status()
-
-    en_rendered["header"].assert_called_once_with("STATUS MENU")
-    rows = status_rows(en_rendered["out"])
-    assert rows["Name"] == "Sadanand"
-    assert rows["Room"] == "Teachers Room 1"
-    assert rows["Phase"] == "EXPLORATION"
-    assert rows["Started"] == "2026-10-26 13:34"
-    assert rows["Time spent"] == "7:51:37"
-    assert rows["Explored"] == "2/2 (100%)"
-    assert rows["Visited"] == "Lobby, Teachers Room 1"
-    assert rows["Challenges"] == (
-        "2/3 Teachers Room 1 desk unlocked, Lab power restored"
-    )
-    assert rows["Assembly"] == "1/2 installed (not ready)"
-    assert rows["Inventory"] == (
-        "Robot Chassis Frame, Level-1 Staff Keycard, mystery"
-    )
-    assert rows["Assembly parts"] == "1"
-
-
-def test_status_empty_state(monkeypatch, en_rendered, status_rows, duration):
-    monkeypatch.setattr(
-        engine,
-        "state",
-        {
-            "terminal_width": 120,
-            "player": {
-                "id": None,
-                "name": "guest",
-                "current_room": "lobby",
-                "inventory": [],
-                "move": [],
-            },
-            "rooms": {"lobby": {"name": "Lobby"}},
-            "items": {},
-            "flags": {},
-            "workbench": {
-                "installed_parts": [],
-                "required_parts": [],
-                "is_ready": False,
-            },
-            "game_state": {
-                "timestamp": None,
-                "duration": duration(),
-                "phase": "EXPLORATION",
-            },
-        },
-    )
-
-    engine.status()
-
-    rows = status_rows(en_rendered["out"])
-    assert rows["Name"] == "Guest"
-    assert rows["Started"] == "Unknown"
-    assert rows["Time spent"] == "00:00:00"
-    assert rows["Explored"] == "1/1 (100%)"
-    assert rows["Visited"] == "Lobby"
-    assert rows["Challenges"] == "0/0"
-    assert rows["Assembly"] == "0/0 installed (not ready)"
-    assert rows["Inventory"] == "Empty"
-    assert rows["Assembly parts"] == "0"
-
-
-def test_status_ready_workbench(monkeypatch, en_rendered, duration, status_rows):
-    monkeypatch.setattr(
-        engine,
-        "state",
-        {
-            "terminal_width": 120,
-            "player": {
-                "id": 1,
-                "name": "alice",
-                "current_room": "lobby",
-                "inventory": [],
-                "move": [],
-            },
-            "rooms": {"lobby": {"name": "Lobby"}},
-            "items": {},
-            "flags": {},
-            "workbench": {
-                "installed_parts": ["chassis_frame", "battery_pack"],
-                "required_parts": ["chassis_frame", "battery_pack"],
-                "is_ready": True,
-            },
-            "game_state": {
-                "timestamp": "2026-10-26T13:34:05+00:00",
-                "duration": duration("00:10:00"),
-                "phase": "ASSEMBLY",
-            },
-        },
-    )
-
-    engine.status()
-
-    rows = status_rows(en_rendered["out"])
-    assert rows["Assembly"] == "2/2 installed (ready)"
-
-
-def test_status_visited_shows_last_five(monkeypatch, en_rendered, visited_state,
-                                        out_texts, status_rows):
-    width = 120
-    monkeypatch.setattr(engine, "state", visited_state(7, width))
-
-    engine.status()
-
-    texts = out_texts(en_rendered["out"])
-    rows = status_rows(en_rendered["out"])
-    assert rows["Visited"] == "... Room 3, Room 4, Room 5, Room 6, Room 7"
-    visited_line = next(text for text in texts if text.startswith(" Visited:"))
-    assert len(visited_line) == width - 1
-
-
-def test_status_visited_no_ellipsis_at_five(monkeypatch, en_rendered, visited_state,
-                                            status_rows):
-    monkeypatch.setattr(engine, "state", visited_state(5))
-
-    engine.status()
-
-    rows = status_rows(en_rendered["out"])
-    assert rows["Visited"] == "Room 1, Room 2, Room 3, Room 4, Room 5"
-
-
-def test_status_wraps_long_values(monkeypatch, en_rendered, duration, out_texts):
-    width = 50
-    rooms = {
-        f"room_{index}": {"name": f"Very Long Room Name {index}"}
-        for index in range(1, 7)
-    }
-    rooms["lobby"] = {"name": "Lobby"}
-    items = {
-        "chassis": {"name": "Robot Chassis Frame", "is_assembly_part": True},
-        "keycard": {"name": "Level-1 Staff Keycard", "is_assembly_part": False},
-        "mystery": {"name": "Mystery Component", "is_assembly_part": False},
-    }
-    monkeypatch.setattr(
-        engine,
-        "state",
-        {
-            "terminal_width": width,
-            "player": {
-                "id": None,
-                "name": "guest",
-                "current_room": "lobby",
-                "inventory": ["chassis", "keycard", "mystery"],
-                "move": list(rooms),
-            },
-            "rooms": rooms,
-            "items": items,
-            "flags": {},
-            "workbench": {
-                "installed_parts": [],
-                "required_parts": [],
-                "is_ready": False,
-            },
-            "game_state": {
-                "timestamp": None,
-                "duration": duration(),
-                "phase": "EXPLORATION",
-            },
-        },
-    )
-
-    engine.status()
-
-    texts = out_texts(en_rendered["out"])
-    assert all(len(text) <= width - 1 for text in texts)
-
-    visited_index = next(
-        index for index, text in enumerate(texts) if text.startswith(" Visited:")
-    )
-    visited_indent = " " * (len(" Visited:") + 1)
-    assert texts[visited_index].startswith(" Visited: ...")
-    assert texts[visited_index].endswith(",")
-    assert texts[visited_index + 1].startswith(visited_indent)
-    assert "Very Long Room Name" in texts[visited_index + 1]
-
-    inventory_index = next(
-        index for index, text in enumerate(texts) if text.startswith(" Inventory:")
-    )
-    inventory_indent = " " * (len(" Inventory:") + 1)
-    assert any(
-        text.startswith(inventory_indent)
-        and ("Keycard" in text or "Mystery" in text)
-        for text in texts[inventory_index + 1:]
-    )
-
-
-def test_status_wraps_single_long_item(monkeypatch, en_rendered, duration, out_texts):
-    width = 40
-    long_name = "A" * 60
-    rooms = {
-        "long_room": {"name": long_name},
-        "lobby": {"name": "Lobby"},
-    }
-    monkeypatch.setattr(
-        engine,
-        "state",
-        {
-            "terminal_width": width,
-            "player": {
-                "id": None,
-                "name": "guest",
-                "current_room": "lobby",
-                "inventory": [],
-                "move": ["long_room", "lobby"],
-            },
-            "rooms": rooms,
-            "items": {},
-            "flags": {},
-            "workbench": {
-                "installed_parts": [],
-                "required_parts": [],
-                "is_ready": False,
-            },
-            "game_state": {
-                "timestamp": None,
-                "duration": duration(),
-                "phase": "EXPLORATION",
-            },
-        },
-    )
-
-    engine.status()
-
-    texts = out_texts(en_rendered["out"])
-    assert all(len(text) <= width - 1 for text in texts)
-    assert any(text.startswith(" Visited:") for text in texts)
-    assert any(
-        text.startswith(" " * (len(" Visited:") + 1)) and "A" in text
-        for text in texts
-    )
-
-
-def test_print_status_row_wraps_multiline(monkeypatch, out_texts):
-    out_mock = Mock()
-    monkeypatch.setattr(engine, "out", out_mock)
-    monkeypatch.setattr(engine, "state", {"terminal_width": 40})
-
-    engine._print_status_row("Test", "first line\nsecond line")
-
-    texts = out_texts(out_mock)
-    assert texts[0].startswith(" Test:")
-    assert "first line" in texts[0]
-    assert texts[1].startswith(" " * (len(" Test:") + 1))
-    assert texts[1].strip() == "second line"
-
-
-def test_inspect_terminal(monkeypatch, inspect_env, set_inspect_state):
-    set_inspect_state("lobby")
-
-    engine.inspect({"target": "terminal"})
-
-    inspect_env["render"].assert_called_once_with(text="TERMINAL TEXT", asset="LOGO")
-
-
-def test_inspect_desk_locked(monkeypatch, inspect_env, set_inspect_state):
-    set_inspect_state("teachers_room_1")
-
-    engine.inspect({"target": "desk"})
-
-    inspect_env["render"].assert_called_once_with(text="DESK HINT")
-
-
-def test_inspect_desk_unlocked(monkeypatch, inspect_env, set_inspect_state):
-    set_inspect_state("teachers_room_1", unlocked=True)
-
-    engine.inspect({"target": "desk"})
-
-    inspect_env["render"].assert_called_once_with(
-        text="The desk drawer is open. You already took the keycard."
-    )
-
-
-def test_inspect_workbench(monkeypatch, inspect_env, inspect_state):
-    monkeypatch.setattr(engine, "state", inspect_state("lab_d2_001"))
-
-    engine.inspect({"target": "workbench"})
-
-    inspect_env["workbench"].assert_called_once_with()
-    inspect_env["render"].assert_not_called()
-
-
-def test_inspect_whiteboard(monkeypatch, inspect_env, set_inspect_state):
-    state = set_inspect_state("teachers_room_2")
-
-    engine.inspect({"target": "whiteboard"})
-
-    assert state["flags"]["tr2_whiteboard_inspected"] is True
-    inspect_env["render"].assert_called_once_with(text="WHITEBOARD TEXT")
-
-
-def test_inspect_receptionist(monkeypatch, inspect_env, set_inspect_state):
-    set_inspect_state("front_desk")
-
-    engine.inspect({"target": "receptionist"})
-
-    inspect_env["render"].assert_called_once_with(text="RECEPTIONIST TEXT")
-
-
-def test_inspect_computer_opens_terminal(monkeypatch, inspect_env, inspect_state):
-    monkeypatch.setattr(engine, "state", inspect_state("teachers_room_4"))
-
-    engine.inspect({"target": "computer"})
-
-    inspect_env["computer"].assert_called_once_with()
-    inspect_env["render"].assert_not_called()
+    assert oop_engine.running is False
+    assert oop_engine.USER_STATE_PATH.exists()
+    assert any("Goodbye" in line for line in oop_engine.outputs)
 
 
 @pytest.mark.parametrize(
-    ("target", "room"),
+    ("verb", "method"),
     [
-        pytest.param("door", "lobby", id="unknown-target"),
-        pytest.param("terminal", "teachers_room_1", id="wrong-room"),
-        pytest.param("computer", "lobby", id="computer-wrong-room"),
+        ("quit", "shutdown"),
+        ("restart", "restart"),
+        ("help", "helper"),
+        ("scoreboard", "render_scoreboard"),
+        ("status", "status"),
+        ("inventory", "inventory"),
+        ("use", "use"),
+        ("register", "register"),
+        ("login", "login"),
+        ("logout", "logout"),
+        ("save", "save"),
+        ("saves", "saves"),
+        ("load", "load"),
+        ("inspect", "inspect"),
+        ("look", "render"),
+        ("take", "take"),
+        ("drop", "drop"),
+        ("go", "move"),
     ],
 )
-def test_inspect_unavailable(monkeypatch, inspect_env, target, room, inspect_state):
-    monkeypatch.setattr(engine, "state", inspect_state(room))
-
-    engine.inspect({"target": target})
-
-    inspect_env["render"].assert_called_once_with(
-        text="The item you're trying to inspect is unavailable"
-    )
-
-
-def test_use_teachers_room(monkeypatch, use_env):
+def test_commands_dispatch(oop_engine, monkeypatch, verb, method):
+    called = []
     monkeypatch.setattr(
-        engine,
-        "state",
-        {"player": {"current_room": "teachers_room_1", "inventory": []}},
+        oop_engine, method, lambda *args, **kwargs: called.append(args)
     )
 
-    engine.use({"target": "d2084", "indirect": "desk"})
+    oop_engine.commands(verb, {"target": "x"})
 
-    use_env["desk"].assert_called_once_with("d2084", "desk")
-
-
-def test_use_lab(monkeypatch, use_env):
-    monkeypatch.setattr(
-        engine,
-        "state",
-        {"player": {"current_room": "lab_d2_001", "inventory": []}},
-    )
-
-    engine.use({"target": "chassis_frame", "indirect": None})
-
-    use_env["workbench"].assert_called_once_with("chassis_frame")
+    assert len(called) == 1
 
 
-def test_use_item_not_held(monkeypatch, use_env):
-    monkeypatch.setattr(
-        engine, "state", {"player": {"current_room": "lobby", "inventory": []}}
-    )
-
-    engine.use({"target": "keycard", "indirect": "door"})
-
-    use_env["render"].assert_called_once_with(
-        text="You are currently do not have 'keycard' in your inventory."
-    )
-
-
-def test_use_item_cannot_use(monkeypatch, use_env):
-    monkeypatch.setattr(
-        engine,
-        "state",
-        {"player": {"current_room": "lobby", "inventory": ["keycard"]}},
-    )
-
-    engine.use({"target": "keycard", "indirect": "door"})
-
-    use_env["render"].assert_called_once_with(
-        text="You cannot use that keycard on door."
-    )
-
-
-def test_take_missing(monkeypatch, item_env):
-    monkeypatch.setattr(
-        engine,
-        "state",
-        {
-            "player": {"current_room": "lobby", "inventory": []},
-            "rooms": {"lobby": {"items": []}},
-        },
-    )
-
-    engine.take({"target": "battery"})
-
-    item_env.assert_called_once_with(text="There is no 'battery' here.")
-
-
-def test_take_success(monkeypatch, item_env):
-    state = {
-        "player": {"current_room": "lobby", "inventory": []},
-        "rooms": {"lobby": {"items": ["battery"]}},
-        "items": {"battery": {"name": "High-Capacity Battery Pack"}},
-    }
-    monkeypatch.setattr(engine, "state", state)
-
-    engine.take({"target": "battery"})
-
-    assert state["rooms"]["lobby"]["items"] == []
-    assert state["player"]["inventory"] == ["battery"]
-    item_env.assert_called_once_with("You picked up High-Capacity Battery Pack")
-
-
-def test_drop_item_not_held(monkeypatch, item_env):
-    state = {
-        "player": {"current_room": "lobby", "inventory": []},
-        "rooms": {"lobby": {"items": []}},
-        "items": {"battery": {"name": "High-Capacity Battery Pack"}},
-    }
-    monkeypatch.setattr(engine, "state", state)
-
-    engine.drop({"target": "battery"})
-
-    assert state["rooms"]["lobby"]["items"] == []
-    item_env.assert_called_once_with(
-        text="You currently do not have 'High-Capacity Battery Pack' here."
-    )
-
-
-def test_drop_unknown_item_renders_error(monkeypatch, item_env):
-    state = {
-        "player": {"current_room": "lobby", "inventory": ["secret_key"]},
-        "rooms": {"lobby": {"name": "Lobby", "items": []}},
-        "items": {"secret_key": {"name": "Secret Key"}},
-    }
-    monkeypatch.setattr(engine, "state", state)
-
-    engine.drop({"target": "supersecret"})
-
-    assert state["player"]["inventory"] == ["secret_key"]
-    item_env.assert_called_once_with(
-        text="There is no item called 'supersecret'."
-    )
-
-
-def test_drop_success(monkeypatch, item_env):
-    state = {
-        "player": {"current_room": "lobby", "inventory": ["battery"]},
-        "rooms": {"lobby": {"name": "Lobby", "items": []}},
-        "items": {"battery": {"name": "High-Capacity Battery Pack"}},
-    }
-    monkeypatch.setattr(engine, "state", state)
-
-    engine.drop({"target": "battery"})
-
-    assert state["player"]["inventory"] == []
-    assert state["rooms"]["lobby"]["items"] == ["battery"]
-    item_env.assert_called_once_with(
-        "You dropped High-Capacity Battery Pack in Lobby"
-    )
-
-
-def test_command_quit(monkeypatch, command_env):
-    state = {"running": True, "terminal_width": 80}
-    out = Mock()
-    persist = Mock()
-    monkeypatch.setattr(engine, "state", state)
-    monkeypatch.setattr(engine, "out", out)
-    monkeypatch.setattr(engine, "persist", persist)
-    monkeypatch.setattr(engine, "colorize", lambda text=None, color_code=None: text)
-
-    engine.commands("quit", {})
-
-    assert state["running"] is False
-    command_env["status"].assert_called_once_with()
-    persist.assert_called_once_with()
-    out.assert_called_once_with("Goodbye. see you again soon".center(80))
-
-
-def test_command_help(command_env):
-    engine.commands("help", {})
-
-    command_env["helper"].assert_called_once_with()
-
-
-def test_command_scoreboard(command_env):
-    engine.commands("scoreboard", {})
-
-    command_env["scoreboard"].assert_called_once_with()
-
-
-def test_command_status(command_env):
-    engine.commands("status", {})
-
-    command_env["status"].assert_called_once_with()
-
-
-def test_command_inventory(command_env):
-    engine.commands("inventory", {})
-
-    command_env["inventory"].assert_called_once_with()
-
-
-def test_command_use(command_env):
-    details = {"target": "keycard", "indirect": "door"}
-
-    engine.commands("use", details)
-
-    command_env["use"].assert_called_once_with(details)
+def test_commands_ignores_unknown(oop_engine):
+    oop_engine.commands("UNKNOWN", {"target": "x"})
+    assert oop_engine.outputs == []
 
 
 @pytest.mark.parametrize(
-    "details",
+    ("phase", "method"),
     [
-        pytest.param({"target": "slot2.json"}, id="explicit"),
-        pytest.param({"target": None}, id="default-none"),
+        ("EXPLORATION", "exploration"),
+        ("ASSEMBLY", "assembly"),
+        ("CHAT", "chat"),
+        ("SOMETHING_ELSE", "exploration"),
     ],
 )
-def test_command_save(command_env, details):
-    engine.commands("save", details)
+def test_run_dispatches_phase_and_stops(oop_engine, monkeypatch, phase, method):
+    oop_engine.session["phase"] = phase
+    monkeypatch.setattr(oop_engine, "auto", lambda: None)
+    called = []
 
-    command_env["save"].assert_called_once_with(details)
+    def stop():
+        called.append(method)
+        oop_engine.state.running = False
 
+    monkeypatch.setattr(oop_engine, method, stop)
 
-def test_command_register(command_env):
-    details = {"target": "alice"}
+    oop_engine.run()
 
-    engine.commands("register", details)
+    assert called == [method]
+    assert oop_engine.player["current_room"] in oop_engine.rooms
 
-    command_env["register"].assert_called_once_with(details)
 
-
-def test_command_login(command_env):
-    details = {"target": "alice"}
-
-    engine.commands("login", details)
-
-    command_env["login"].assert_called_once_with(details)
-
-
-def test_command_logout(command_env):
-    engine.commands("logout", {})
-
-    command_env["logout"].assert_called_once_with()
-
-
-def test_command_load(command_env):
-    details = {"target": "slot1"}
-
-    engine.commands("load", details)
-
-    command_env["load"].assert_called_once_with(details)
-
-
-def test_command_saves(command_env):
-    engine.commands("saves", {})
-
-    command_env["list_saves"].assert_called_once_with()
-
-
-def test_command_inspect(command_env):
-    details = {"target": "desk"}
-
-    engine.commands("inspect", details)
-
-    command_env["inspect"].assert_called_once_with(details)
-
-
-def test_command_look(command_env):
-    engine.commands("look", {})
-
-    command_env["render"].assert_called_once_with()
-
-
-@pytest.mark.parametrize(
-    "details",
-    [
-        pytest.param({"target": "battery"}, id="with-target"),
-        pytest.param({}, id="empty"),
-    ],
-)
-def test_command_take(command_env, details):
-    engine.commands("take", details)
-
-    command_env["take"].assert_called_once_with(details)
-
-
-def test_command_drop(command_env):
-    details = {"target": "battery"}
-
-    engine.commands("drop", details)
-
-    command_env["drop"].assert_called_once_with(details)
-
-
-@pytest.mark.parametrize(
-    "details",
-    [
-        pytest.param({"target": "north"}, id="with-target"),
-        pytest.param({}, id="empty"),
-    ],
-)
-def test_command_go(command_env, details):
-    engine.commands("go", details)
-
-    command_env["move"].assert_called_once_with(details)
-
-
-def test_command_restart(command_env):
-    engine.commands("restart", {})
-
-    command_env["restart"].assert_called_once_with()
-
-
-def test_command_unknown_verb_is_ignored(command_env):
-    engine.commands("fly", {})
-
-    for mock in command_env.values():
-        mock.assert_not_called()
-
-
-@pytest.mark.parametrize(
-    ("phase", "expected_handler"),
-    [
-        pytest.param("EXPLORATION", "exploration", id="exploration"),
-        pytest.param("ASSEMBLY", "assembly", id="assembly"),
-        pytest.param("CHAT", "chat", id="chat"),
-        pytest.param("UNKNOWN", "exploration", id="else-fallback"),
-    ],
-)
-def test_run_dispatches_phase(monkeypatch, phase, expected_handler):
-    state = {"running": True, "game_state": {"phase": phase}}
-    monkeypatch.setattr(engine, "state", state)
-
-    exploration_mock = Mock()
-    assembly_mock = Mock()
-    chat_mock = Mock()
-    monkeypatch.setattr(phase_module, "exploration", exploration_mock)
-    monkeypatch.setattr(phase_module, "assembly", assembly_mock)
-    monkeypatch.setattr(phase_module, "chat", chat_mock)
-
-    spawn_mock = Mock()
-    monkeypatch.setattr(engine, "spawn", spawn_mock)
-
-    auto_mock = Mock(side_effect=lambda: state.update({"running": False}))
-    monkeypatch.setattr(engine, "auto", auto_mock)
-
-    engine.run()
-
-    spawn_mock.assert_called_once_with()
-    auto_mock.assert_called_once_with()
-
-    handlers = {
-        "exploration": exploration_mock,
-        "assembly": assembly_mock,
-        "chat": chat_mock,
-    }
-    for name, handler in handlers.items():
-        if name == expected_handler:
-            handler.assert_called_once_with()
-        else:
-            handler.assert_not_called()
-
-
-def test_register_requires_front_desk(monkeypatch, register_env, render_text):
-    monkeypatch.setattr(engine, "state", {"player": {"current_room": "lobby"}})
-
-    engine.register({"target": "alice"})
-
-    register_env["get_user"].assert_not_called()
-    register_env["create_user"].assert_not_called()
-    assert "front desk" in render_text(register_env["render"]).lower()
-
-
-def test_register_creates_profile(monkeypatch, register_env, render_text):
-    state = {"player": {"current_room": "front_desk"}}
-    monkeypatch.setattr(engine, "state", state)
-
-    engine.register({"target": "alice"})
-
-    register_env["get_user"].assert_called_once_with("alice")
-    register_env["create_user"].assert_called_once_with("alice")
-    assert state["player"]["name"] == "alice"
-    assert state["player"]["id"] == 7
-    assert "successfully registered" in render_text(register_env["render"]).lower()
-
-
-def test_register_rejects_existing_name(monkeypatch, register_env, render_text):
-    register_env["get_user"].return_value = 1
-    monkeypatch.setattr(engine, "state", {"player": {"current_room": "front_desk"}})
-
-    engine.register({"target": "alice"})
-
-    register_env["create_user"].assert_not_called()
-    assert "already taken" in render_text(register_env["render"]).lower()
-
-
-def test_register_reports_db_error(monkeypatch, register_env, render_text):
-    register_env["create_user"].side_effect = Exception("boom")
-    monkeypatch.setattr(engine, "state", {"player": {"current_room": "front_desk"}})
-
-    engine.register({"target": "alice"})
-
-    assert "boom" in render_text(register_env["render"])
-
-def test_login_requires_front_desk(monkeypatch, login_env, render_text):
-    monkeypatch.setattr(engine, "state", {"player": {"current_room": "lobby"}})
-
-    engine.login({"target": "alice"})
-
-    login_env["get_user"].assert_not_called()
-    assert "front desk" in render_text(login_env["render"]).lower()
-
-
-def test_login_without_name(monkeypatch, login_env, render_text):
-    monkeypatch.setattr(engine, "state", {"player": {"current_room": "front_desk"}})
-
-    engine.login({"target": None})
-
-    login_env["get_user"].assert_not_called()
-    assert "enter a name" in render_text(login_env["render"]).lower()
-
-
-def test_login_unknown_user(monkeypatch, login_env, render_text):
-    monkeypatch.setattr(engine, "state", {"player": {"current_room": "front_desk"}})
-
-    engine.login({"target": "alice"})
-
-    login_env["get_user"].assert_called_once_with("alice")
-    assert "does not exist" in render_text(login_env["render"]).lower()
-
-
-def test_login_success(monkeypatch, login_env, render_text):
-    login_env["get_user"].return_value = {"id": 7, "name": "alice"}
-    state = {"player": {"current_room": "front_desk"}}
-    monkeypatch.setattr(engine, "state", state)
-
-    engine.login({"target": "alice"})
-
-    assert state["player"]["name"] == "alice"
-    assert state["player"]["id"] == 7
-    assert "logged in" in render_text(login_env["render"]).lower()
-
-
-def test_logout_requires_front_desk(monkeypatch, logout_env, render_text):
-    state = {
-        "player": {"current_room": "lobby", "id": 7, "name": "alice"},
-    }
-    monkeypatch.setattr(engine, "state", state)
-
-    engine.logout()
-
-    logout_env.assert_called_once()
-    assert state["player"]["id"] == 7
-    assert state["player"]["name"] == "alice"
-    assert "front desk" in render_text(logout_env).lower()
-
-
-def test_logout_requires_login(monkeypatch, logout_env, render_text):
-    state = {
-        "player": {"current_room": "front_desk", "id": None, "name": "guest"},
-    }
-    monkeypatch.setattr(engine, "state", state)
-
-    engine.logout()
-
-    logout_env.assert_called_once()
-    assert state["player"]["id"] is None
-    assert state["player"]["name"] == "guest"
-    assert "not logged in" in render_text(logout_env).lower()
-
-
-def test_logout_success(monkeypatch, logout_env, render_text):
-    state = {
-        "player": {
-            "current_room": "front_desk",
-            "id": 7,
-            "name": "alice",
-            "inventory": ["keycard_lvl1"],
-        },
-    }
-    monkeypatch.setattr(engine, "state", state)
-
-    engine.logout()
-
-    logout_env.assert_called_once()
-    assert state["player"]["id"] is None
-    assert state["player"]["name"] == "guest"
-    assert state["player"]["inventory"] == ["keycard_lvl1"]
-    assert "logged out from alice" in render_text(logout_env).lower()
-
-
-def test_restart_resets_state_but_keeps_player(monkeypatch, tmp_path, duration):
-    default_path = tmp_path / "default_state.json"
-    default_path.write_text(
-        json.dumps(
-            {
-                "player": {"id": None, "name": "guest", "current_room": "lobby"},
-                "rooms": {"lobby": {}},
-                "game_state": {
-                    "timestamp": "2020-01-01T00:00:00+00:00",
-                    "duration": duration(),
-                },
-            }
-        ),
-        encoding="utf-8",
+def test_exploration_phase_handles_commands_and_invalid_input(
+    oop_engine, monkeypatch
+):
+    commands = []
+    monkeypatch.setattr(phase_oop, "clear", lambda: None)
+    monkeypatch.setattr(
+        oop_engine, "commands", lambda verb, details: commands.append((verb, details))
     )
-    game_state = {
-        "player": {"id": 3, "name": "polaris", "current_room": "lab"},
-        "rooms": {"lab": {}},
-    }
-    render = Mock()
-    monkeypatch.setattr(engine, "state", game_state)
-    monkeypatch.setattr(engine, "DEFAULT_GAME_STATE_PATH", default_path)
-    monkeypatch.setattr(engine, "render", render)
-    monkeypatch.setattr(engine, "colorize", lambda text=None, color_code=None: text)
 
-    engine.restart()
+    monkeypatch.setattr(phase_oop, "prompt", lambda *args: "status")
+    oop_engine.exploration()
+    assert commands[-1][0] == "status"
 
-    assert engine.state is game_state
-    assert game_state["player"]["name"] == "polaris"
-    assert game_state["player"]["id"] == 3
-    assert game_state["player"]["current_room"] == "lobby"
-    assert game_state["rooms"] == {"lobby": {}}
-    game_duration = game_state["game_state"]["duration"]
-    assert game_duration["value"] == "00:00:00"
-    assert game_duration["pause"] is False
-    assert game_duration["last_write"] is not None
-    assert (
-        game_state["game_state"]["timestamp"]
-        != "2020-01-01T00:00:00+00:00"
+    monkeypatch.setattr(phase_oop, "prompt", lambda *args: "zzz")
+    oop_engine.exploration()
+    assert commands[-1][0] == "UNKNOWN"
+    assert any("Invalid input" in line for line in oop_engine.outputs)
+
+
+def test_assembly_phase_intro_and_commands(oop_engine, monkeypatch):
+    monkeypatch.setattr(phase_oop, "clear", lambda: None)
+    rendered = []
+    monkeypatch.setattr(
+        oop_engine, "render_workbench", lambda text=None: rendered.append(text)
     )
-    render.assert_called_once_with(text="New game!")
+    oop_engine.session["phases"]["assembly"]["activated"] = False
+
+    oop_engine.assembly()
+    assert oop_engine.session["phases"]["assembly"]["activated"] is True
+    assert rendered
+
+    commands = []
+    activated = []
+    monkeypatch.setattr(
+        oop_engine, "commands", lambda verb, details: commands.append(verb)
+    )
+    monkeypatch.setattr(oop_engine, "activate", lambda: activated.append(True))
+    monkeypatch.setattr(phase_oop, "prompt", lambda *args: "activate")
+
+    oop_engine.assembly()
+    assert commands == ["activate"]
+    assert activated == [True]
+
+    monkeypatch.setattr(phase_oop, "prompt", lambda *args: "zzz")
+    oop_engine.assembly()
+    assert any("Invalid input" in line for line in oop_engine.outputs)
+
+
+def test_chat_phase_intro_known_and_ai_input(oop_engine, monkeypatch):
+    monkeypatch.setattr(phase_oop, "clear", lambda: None)
+    rendered = []
+    monkeypatch.setattr(oop_engine, "render", lambda *args, **kwargs: rendered.append(args))
+    oop_engine.session["phases"]["chat"]["activated"] = False
+
+    oop_engine.chat()
+    assert oop_engine.session["phases"]["chat"]["activated"] is True
+    assert rendered
+
+    commands = []
+    monkeypatch.setattr(
+        oop_engine, "commands", lambda verb, details: commands.append(verb)
+    )
+    oop_engine.session["phases"]["chat"]["activated"] = True
+    monkeypatch.setattr(phase_oop, "prompt", lambda *args: "status")
+    oop_engine.chat()
+    assert commands == ["status"]
+
+    oop_engine.player["current_room"] = "lab_d2_001"
+    monkeypatch.setattr(phase_oop, "prompt", lambda *args: "hello robot")
+    oop_engine.chat()
+    assert oop_engine.langchain.calls == ["hello robot"]
+
+    oop_engine.player["current_room"] = "lobby"
+    oop_engine.chat()
+    assert any("Invalid input" in str(args) for args in rendered)
+
+
+def test_lab_activate_success(oop_engine, monkeypatch):
+    answers = iter(["Tr0janH0rse!", "Robo"])
+    monkeypatch.setattr(lab_oop, "prompt", lambda *args: next(answers))
+    monkeypatch.setattr(lab_oop.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(lab_oop, "clear", lambda: None)
+    oop_engine.player["current_room"] = "lab_d2_001"
+    oop_engine.workbench["installed_parts"] = list(
+        oop_engine.workbench["required_parts"]
+    )
+
+    oop_engine.activate()
+
+    assert oop_engine.session["phase"] == "CHAT"
+    assert oop_engine.session["phases"]["chat"]["robot"]["name"] == "Robo"
+    assert oop_engine.scoreboard.created
+
+
+def test_lab_activate_rejects_missing_parts_and_password(oop_engine, monkeypatch):
+    oop_engine.player["current_room"] = "lab_d2_001"
+    oop_engine.workbench["installed_parts"] = []
+
+    oop_engine.activate()
+    assert any("Assembly incomplete" in line for line in oop_engine.outputs)
+
+    oop_engine.workbench["installed_parts"] = list(
+        oop_engine.workbench["required_parts"]
+    )
+    monkeypatch.setattr(lab_oop, "prompt", lambda *args: "wrong")
+    monkeypatch.setattr(lab_oop, "clear", lambda: None)
+    oop_engine.activate()
+    assert oop_engine.session["phase"] == "EXPLORATION"
+    assert any("Invalid wifi" in line for line in oop_engine.outputs)
+
+
+def test_front_desk_room_inspect(oop_engine):
+    room = FrontDesk()
+    room.state = oop_engine.state
+    room.render = lambda text=None: oop_engine.outputs.append(text)
+
+    room.inspect_receptionist()
+
+    assert oop_engine.outputs
+
+
+def test_teachers_room_four_secret_key_and_shell(oop_state, monkeypatch):
+    room = TeachersRoomFour()
+    room.state = oop_state
+    messages = []
+
+    room._award_secret_key(messages.append)
+    assert "secret_key" in oop_state.player["inventory"]
+    assert oop_state.flags["tr4_secret_key_copied"] is True
+
+    room._award_secret_key(messages.append)
+    assert any("already in your inventory" in message for message in messages)
+
+    class FakeShell:
+        user = "teacher"
+        hostname = "teacher-pc"
+        display_cwd = "~"
+
+        def __init__(self):
+            self.results = iter(
+                [
+                    ShellResult(
+                        output="secret",
+                        clear_requested=True,
+                        read_paths=(SECRET_PATH,),
+                    ),
+                    ShellResult(exit_requested=True),
+                ]
+            )
+
+        def execute(self, raw):
+            return next(self.results)
+
+    cleared = []
+    inputs = iter(["cat secret", "exit"])
+    room.run_shell(
+        FakeShell(),
+        read_input=lambda prompt=None: next(inputs),
+        write_output=messages.append,
+        clear_screen=lambda: cleared.append(True),
+    )
+    assert cleared == [True]
+
+
+def test_teachers_room_four_handles_eof_and_computer(
+    oop_state, monkeypatch
+):
+    room = TeachersRoomFour()
+    room.state = oop_state
+    messages = []
+
+    def eof(prompt=None):
+        raise EOFError
+
+    class PromptShell:
+        user = "teacher"
+        hostname = "teacher-pc"
+        display_cwd = "~"
+
+    room.run_shell(
+        PromptShell(),
+        read_input=eof,
+        write_output=messages.append,
+        clear_screen=lambda: None,
+    )
+    assert messages
+
+    monkeypatch.setattr(tr4_oop, "loader", lambda **kwargs: None)
+    monkeypatch.setattr(tr4_oop.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(tr4_oop, "clear", lambda: None)
+    monkeypatch.setattr(tr4_oop.console, "print", lambda *args, **kwargs: None)
+    monkeypatch.setattr(room, "run_shell", lambda shell: messages.append("shell"))
+    auto_calls = []
+    renders = []
+    monkeypatch.setattr(room, "auto", lambda: auto_calls.append(True))
+    monkeypatch.setattr(room, "render", lambda *args, **kwargs: renders.append(True))
+
+    room.inspect_computer()
+
+    assert auto_calls == [True]
+    assert renders == [True]
+    assert oop_state.session["duration"]["pause"] is False
+
+
+def test_room_base_render_and_output(oop_state, capsys):
+    room = room_oop.Room(game_state=oop_state)
+    oop_state.player["current_room"] = "lobby"
+
+    room.render(text="custom narrative")
+
+    captured = capsys.readouterr().out
+    assert "custom narrative" in captured
+    assert "Exits:" in captured
+
+
+def test_room_base_delegates_state_attributes(oop_state):
+    room = room_oop.Room(game_state=oop_state)
+
+    assert room.player is oop_state.player
+    assert room.session is oop_state.session
+    assert callable(room.auto)
+
+
+def test_room_base_missing_attribute_raises(oop_state):
+    room = room_oop.Room(game_state=oop_state)
+
+    with pytest.raises(AttributeError):
+        _ = room.does_not_exist

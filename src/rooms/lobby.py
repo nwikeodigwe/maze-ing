@@ -1,13 +1,16 @@
 """Lobby room.
 
-No lobby-specific logic is needed: its data lives in ``data/default_state.json`` and the lobby ``terminal``
-interaction is handled by :func:`src.engine.inspect`.
+No lobby-specific logic is needed beyond the terminal interaction; its data
+lives in ``data/rooms.json``.
 """
 from src.assets.logo import logo
-from src.room import render
-from src.state import state
+from src.room import Room
 
 
-def inspect_terminal() -> None:
-    render(text=state["rooms"]["lobby"]["interactables"]["terminal"], asset=logo)
-    return None
+class Lobby(Room):
+    def inspect_terminal(self) -> None:
+        self.render(
+            text=self.rooms["lobby"]["interactables"]["terminal"],
+            asset=logo,
+        )
+        return None

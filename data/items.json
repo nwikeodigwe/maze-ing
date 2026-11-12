@@ -1,0 +1,80 @@
+{
+      "secret_key": {
+          "id": "secret_key",
+          "name": "Secret Key",
+          "description": "Encrypted schematic detailing the 8 requisite hardware modules needed to assemble the A-maze-ing-Delft prototype.",
+          "is_assembly_part": false
+      },
+      "blueprint": {
+          "id": "robot_assembly_blueprint",
+          "name": "Robot Assembly Blueprint",
+          "description": "Diagram listing all 8 components needed to construct A-maze-ing-Delft",
+          "is_assembly_part": false
+      },
+      "chassis_frame": {
+          "id": "robot_chasis_frame",
+          "name": "Robot Chassis Frame",
+          "description": "An aluminum skeleton designed to house microcontrollers and servos.",
+          "is_assembly_part": true
+      },
+       "paper_clip": {
+          "id": "paper_clip",
+          "name": "Paper Clip",
+          "description": "A small piece of bent steel wire. Useful for securing documents or picking delicate internal switches.",
+          "is_assembly_part": false
+      },
+       "coffee_cup": {
+          "id": "coffee_cup",
+          "name": "Coffee Cup",
+          "description": "A ceramic mug filled with lukewarm coffee. Provides a mild focus boost and a brief distraction from terminal diagnostic logs",
+          "is_assembly_part": false
+      },
+      "mega_phone": {
+          "id": "mega_phone",
+          "name": "Mega Phone",
+          "description": "A portable loudspeaker module capable of outputting synthesized voice frequencies.",
+          "is_assembly_part": true
+      },
+      "keycard_lvl1": {
+          "id": "keycard_lvl1",
+          "name": "Level-1 Staff Keycard",
+          "description": "A magnetic keycard. Opens restricted project and staff rooms.",
+          "is_assembly_part": false
+      },
+      "battery_pack": {
+          "id": "keycard_lvl1",
+          "name": "High-Capacity Battery Pack",
+          "description": "A heavy 24V lithium-ion battery unit with high discharge current.",
+          "is_assembly_part": true
+      },
+      "mainboard": {
+          "id": "microcontroller_mainboard",
+          "name": "Microcontroller / Mainboard",
+          "description": "A high-performance computing board equipped with custom neural processors.",
+          "is_assembly_part": true
+      },
+      "sensory_module": {
+          "id": "sensory_module",
+          "name": "Sensory Module",
+          "description": "A integrated unit containing a high-res camera and dual-microphone array.",
+          "is_assembly_part": true
+      },
+      "wifi_credentials": {
+          "id": "wifi_credentials",
+          "name": "Wi-Fi Credentials Note",
+          "description": "A slip of paper with network ID 'CS_LAB_NET' and its WPA2 passkey.",
+          "is_assembly_part": true
+      },
+      "motors_speakers": {
+          "id": "motors_speakers",
+          "name": "Servo Motors & Speaker Assembly",
+          "description": "Actuators for physical joint rotation along with an audio driver.",
+          "is_assembly_part": true
+      },
+      "api_usb": {
+          "id": "api_usb",
+          "name": "Encrypted API & Prompt USB Drive",
+          "description": "Contains OpenAI API auth keys and system instructions for the robot.",
+          "is_assembly_part": true
+      }
+  }

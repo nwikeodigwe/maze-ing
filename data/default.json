@@ -1,0 +1,78 @@
+{
+    "player": {
+        "id": null,
+        "name": "guest",
+        "current_room": "lobby",
+        "inventory": [],
+        "move": [],
+        "forward": []
+    },
+    "workbench": {
+        "installed_parts": [],
+        "required_parts": [
+            "chassis_frame",
+            "battery_pack",
+            "mainboard",
+            "sensory_module",
+            "wifi_credentials",
+            "motors_speakers",
+            "api_usb",
+            "mega_phone"
+        ],
+        "is_ready": false
+    },
+    "flags": {
+        "fr1_user_registered": false,
+        "tr1_desk_unlocked": false,
+        "tr2_whiteboard_inspected": false,
+        "tr4_drawer_decrypted": false,
+        "tr4_secret_key_copied": false,
+        "lab_power_on": false
+    },
+    "session": {
+        "save_version": "1.0.0",
+        "timestamp": null,
+        "duration": {
+            "last_write": null,
+            "value": "00:00:00",
+            "pause": false
+        },
+        "phase": "EXPLORATION",
+        "phases": {
+            "exploration": {
+                "activated": false,
+                "timestamp": null,
+                "duration": {
+                    "last_write": null,
+                    "value": "00:00:00",
+                    "pause": false
+                }
+            },
+            "assembly": {
+                "activated": false,
+                "timestamp": null,
+                "wifi_password": "Tr0janH0rse!",
+                "duration": {
+                    "last_write": null,
+                    "value": "00:00:00",
+                    "pause": false
+                }
+            },
+            "chat": {
+                "activated": false,
+                "mock": false,
+                "timestamp": null,
+                "robot": {
+                    "name": "Jarvis",
+                    "default": "Render a helpful message congratulating the user on completing the game and a welcome message(welcome to chat mode.",
+                    "history": []
+                },
+                "duration": {
+                    "last_write": null,
+                    "value": "00:00:00",
+                    "pause": false
+                }
+            }
+        }
+    }
+}

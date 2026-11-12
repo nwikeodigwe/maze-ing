@@ -7,7 +7,7 @@ This repository contains our Q1 Project for the Applied Computer Science (ACS) p
 
 The goal of the project is to:
 * Develop a modular Python terminal application adhering to clean architecture principles.
-* Implement structured state management (`user_state.json`) with dynamic persistence.
+* Implement structured state management (`user.json`) with dynamic persistence.
 * Integrate streaming AI model interaction via LLM APIs (`google-genai` / `openai`) alongside a offline mock fallback.
 * Provide an engaging CLI user interface using ANSI terminal formatting and status rendering.
 
