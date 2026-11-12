@@ -4,8 +4,9 @@
 .ruff_cache/
 *.pyc
 data/saves/*
-data/user_state.json
+data/user.json
 data/game.db
+data/game.log
 .mailmap
 .env
 debug.py
