@@ -1,4 +1,5 @@
 import textwrap
+
 from datetime import datetime, timezone
 from typing import Any
 
@@ -12,10 +13,10 @@ from src.rooms.lobby import Lobby
 from src.rooms.teachers_room_1 import TeachersRoomOne
 from src.rooms.teachers_room_2 import TeachersRoomTwo
 from src.rooms.teachers_room_4 import TeachersRoomFour
-from src.state import State
 from src.utils.colors import Colors
 from src.utils.time import format_timestamp
 from src.utils.display import out, colorize
+from src.state import State
 
 STATUS_FLAG_LABELS = {
     "fr1_user_registered": "Front desk registration",
