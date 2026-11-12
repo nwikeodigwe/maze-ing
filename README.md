@@ -1,4 +1,5 @@
-# ACS15 A-maze-ing-Delft
+# ACS15 A-maze-ing-Delft [![codecov](https://codecov.io/gh/nwikeodigwe/maze-ing/branch/main/graph/badge.svg)](https://codecov.io/gh/nwikeodigwe/maze-ing)
+
 
 ## Description
 This repository contains our Q1 Project for the Applied Computer Science (ACS) program at The Hague University of Applied Sciences (THUAS). 
@@ -34,5 +35,5 @@ The goal of the project is to:
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/THUAS-ACS15/A-maze-ing-Delft.git](https://github.com/THUAS-ACS15/A-maze-ing-Delft.git)
-   cd A-maze-ing-Delft
+   git clone [https://github.com/nwikeodigwe/maze-ing.git](https://github.com/nwikeodigwe/maze-ing.git)
+   cd maze-ing
