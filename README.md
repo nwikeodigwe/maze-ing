@@ -1,4 +1,4 @@
-# ACS15 A-maze-ing-Delft [![codecov](https://codecov.io/gh/nwikeodigwe/maze-ing/branch/main/graph/badge.svg)](https://codecov.io/gh/nwikeodigwe/maze-ing)
+# ACS15 A-maze-ing-Delft ![Test Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/nwikeodigwe/dca3bffcba872b0a6c274ad5ca36e73d/raw/coverage.json)
 
 
 ## Description
@@ -35,5 +35,5 @@ The goal of the project is to:
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/nwikeodigwe/maze-ing.git](https://github.com/nwikeodigwe/maze-ing.git)
+   git clone https://github.com/nwikeodigwe/maze-ing.git
    cd maze-ing

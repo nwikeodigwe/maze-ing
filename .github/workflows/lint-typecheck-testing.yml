@@ -1,5 +1,5 @@
 name: A-maze-ing-Delft CI
-run-name: CI Linting, Type Check and Testing for ${{ github.ref_name }} by @${{ github.actor }}
+run-name: CI Linting, Type Check and Testing
 description: Automated code quality and testing pipeline that enforces formatting (Black), linting (Ruff), and static type safety (Mypy) and testing on main branch pushes and pull requests.
 
 on:
@@ -35,6 +35,26 @@ jobs:
       - name: Type check with Mypy
         run: |
           mypy .
-      - name: Testing
+
+      - name: Testing with coverage
         run: |
-          pytest
+          mkdir -p coverage
+          pytest --cov-report=json:coverage/coverage-summary.json
+
+      - name: Extract coverage percentage
+        id: coverage
+        run: |
+          PERCENTAGE=$(jq -r '.total.lines.pct' coverage/coverage-summary.json)
+          echo "pct=$PERCENTAGE" >> $GITHUB_OUTPUT
+
+      - name: Update Coverage Badge Gist
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: dca3bffcba872b0a6c274ad5ca36e73d
+          filename: coverage.json
+          label: Coverage
+          message: ${{ steps.coverage.outputs.pct }}%
+          valColorRange: ${{ steps.coverage.outputs.pct }}
+          minColorRange: 50
+          maxColorRange: 90
