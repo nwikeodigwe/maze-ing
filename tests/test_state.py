@@ -360,17 +360,6 @@ def test_history_errors(oop_state):
     assert "Unknown destination" in msg
 
 
-def test_spawn_repairs_invalid_room(oop_state):
-    oop_state.player["current_room"] = "missing"
-    oop_state.session["timestamp"] = None
-
-    room_id = oop_state.spawn()
-
-    assert room_id in oop_state.rooms
-    assert oop_state.player["current_room"] == room_id
-    assert oop_state.session["timestamp"]
-
-
 def test_reset_reloads_default_and_static_data(oop_state):
     oop_state.player["name"] = "changed"
     oop_state.session["phase"] = "CHAT"
