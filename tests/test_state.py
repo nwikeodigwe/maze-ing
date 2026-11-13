@@ -163,13 +163,12 @@ def test_auto_advances_assembly_timer(oop_state, monkeypatch):
 
 
 def test_save_requires_login(oop_state):
-    messages = []
-    oop_state.render_room = lambda text=None: messages.append(text)
     oop_state.player["id"] = None
 
-    oop_state.save(None)
+    ok, msg = oop_state.save(None)
 
-    assert messages and "registered" in messages[0]
+    assert not ok
+    assert "registered" in msg
 
 
 def test_save_creates_next_slot_and_sanitizes_names(oop_state):
@@ -186,13 +185,12 @@ def test_save_creates_next_slot_and_sanitizes_names(oop_state):
 
 
 def test_save_refuses_existing_slot(oop_state):
-    messages = []
-    oop_state.render_room = lambda text=None: messages.append(text)
     oop_state.save({"target": "slot"})
 
-    oop_state.save({"target": "slot"})
+    ok, msg = oop_state.save({"target": "slot"})
 
-    assert any("unexpected error" in message.lower() for message in messages)
+    assert not ok
+    assert "unexpected error" in msg.lower()
 
 
 def test_list_saves_reports_missing_login(oop_state):
@@ -205,7 +203,7 @@ def test_list_saves_reports_missing_login(oop_state):
 
 
 def test_list_saves_returns_rows(oop_state):
-    rows = [{"slot": "slot-one", "created_at": "2026-01-01T00:00:00Z"}]
+    rows = [{"slot": "slot-one", "created_at": "2026-01-01T00:00:00Z", "user_id": 1}]
     oop_state._saves.rows = rows
 
     ok, result = oop_state.list_saves()
@@ -222,26 +220,24 @@ def test_list_saves_empty(oop_state):
 
 
 def test_load_requires_login_and_ownership(oop_state):
-    messages = []
-    oop_state.render_room = lambda text=None: messages.append(text)
-
     oop_state.player["id"] = None
-    oop_state.load({"target": "slot"})
-    assert any("register" in message for message in messages)
+    ok, msg = oop_state.load({"target": "slot"})
+    assert not ok
+    assert "register" in msg
 
     oop_state.player["id"] = 1
-    oop_state.load({"target": "slot"})
-    assert any("do not have any progress" in message for message in messages)
+    ok, msg = oop_state.load({"target": "slot"})
+    assert not ok
+    assert "do not have any progress" in msg
 
-    oop_state._saves.unique[("slot", 1)] = {"slot": "slot"}
-    oop_state.load({"target": "slot"})
-    assert any("no saved progress" in message for message in messages)
+    oop_state._saves.rows = [{"slot": "slot", "user_id": 1}]
+    ok, msg = oop_state.load({"target": "slot"})
+    assert not ok
+    assert "no saved progress" in msg
 
 
 def test_load_restores_save_and_static_data(oop_state):
-    messages = []
-    oop_state.render_room = lambda text=None: messages.append(text)
-    oop_state._saves.unique[("slot", 1)] = {"slot": "slot"}
+    oop_state._saves.rows = [{"slot": "slot", "user_id": 1}]
     oop_state.SAVE_DIR.mkdir(parents=True, exist_ok=True)
     payload = {
         "player": {
@@ -270,26 +266,25 @@ def test_load_restores_save_and_static_data(oop_state):
     }
     (oop_state.SAVE_DIR / "slot.json").write_text(json.dumps(payload), encoding="utf-8")
 
-    oop_state.load({"target": "slot.json"})
+    ok, msg = oop_state.load({"target": "slot.json"})
 
+    assert ok
+    assert "Game loaded" in msg
     assert oop_state.player["name"] == "loaded"
     assert oop_state.player["current_room"] == "teachers_room_1"
     assert "lobby" in oop_state.rooms
     assert "secret_key" in oop_state.items
     assert oop_state.session["duration"]["last_write"]
-    assert any("Game loaded" in message for message in messages)
 
 
 def test_move_direction_and_room_name(oop_state):
-    messages = []
-    oop_state.render_room = lambda text=None: messages.append(text)
-
-    oop_state.move({"target": "east"})
+    ok, msg = oop_state.move({"target": "east"})
+    assert ok
     assert oop_state.player["current_room"] == "teachers_room_1"
     assert oop_state.player["move"] == ["lobby"]
-    assert messages[-1] is None
 
-    oop_state.move({"target": "lobby"})
+    ok, msg = oop_state.move({"target": "lobby"})
+    assert ok
     assert oop_state.player["current_room"] == "lobby"
     assert oop_state.player["move"] == ["lobby", "teachers_room_1"]
 
@@ -305,33 +300,31 @@ def test_move_back_and_forward(oop_state):
 
 
 def test_move_reports_bad_destinations(oop_state):
-    messages = []
-    oop_state.render_room = lambda text=None: messages.append(text)
-    oop_state.move({"target": "nowhere"})
-    assert any("cannot go to nowhere" in message for message in messages)
+    ok, msg = oop_state.move({"target": "nowhere"})
+    assert not ok
+    assert "cannot go to nowhere" in msg
 
     oop_state.rooms["lobby"]["exits"]["up"] = "missing_room"
-    oop_state.move({"target": "missing_room"})
-    assert any("Unknown destination" in message for message in messages)
+    ok, msg = oop_state.move({"target": "missing_room"})
+    assert not ok
+    assert "Unknown destination" in msg
 
 
 def test_move_enforces_locks(oop_state):
-    messages = []
-    oop_state.render_room = lambda text=None: messages.append(text)
     oop_state.player["current_room"] = "classroom_d_2035"
 
-    oop_state.move({"target": "project_room_1"})
+    ok, msg = oop_state.move({"target": "project_room_1"})
+    assert not ok
+    assert "locked" in msg.lower()
     assert oop_state.player["current_room"] == "classroom_d_2035"
-    assert any("locked" in message.lower() for message in messages)
 
     oop_state.player["inventory"].append("keycard_lvl1")
-    oop_state.move({"target": "project_room_1"})
+    ok, _ = oop_state.move({"target": "project_room_1"})
+    assert ok
     assert oop_state.player["current_room"] == "project_room_1"
 
 
 def test_move_rejects_restricted_room_without_requirement(oop_state):
-    messages = []
-    oop_state.render_room = lambda text=None: messages.append(text)
     oop_state.rooms["restricted"] = {
         "name": "Restricted",
         "description": "No entry",
@@ -341,27 +334,30 @@ def test_move_rejects_restricted_room_without_requirement(oop_state):
     }
     oop_state.rooms["lobby"]["exits"]["down"] = "restricted"
 
-    oop_state.move({"target": "restricted"})
+    ok, msg = oop_state.move({"target": "restricted"})
 
-    assert any("locked" in message.lower() for message in messages)
+    assert not ok
+    assert "locked" in msg.lower()
 
 
 def test_history_errors(oop_state):
-    messages = []
-    oop_state.render_room = lambda text=None: messages.append(text)
+    ok, msg = oop_state.move({"target": "back"})
+    assert not ok
+    assert "no previous room" in msg
 
-    oop_state.move({"target": "back"})
-    oop_state.move({"target": "forward"})
-    assert any("no previous room" in message for message in messages)
-    assert any("no forward room" in message for message in messages)
+    ok, msg = oop_state.move({"target": "forward"})
+    assert not ok
+    assert "no forward room" in msg
 
     oop_state.player["move"] = ["missing"]
-    oop_state.move({"target": "back"})
-    assert any("Unknown destination" in message for message in messages)
+    ok, msg = oop_state.move({"target": "back"})
+    assert not ok
+    assert "Unknown destination" in msg
 
     oop_state.player["forward"] = ["missing"]
-    oop_state.move({"target": "forward"})
-    assert any("Unknown destination" in message for message in messages)
+    ok, msg = oop_state.move({"target": "forward"})
+    assert not ok
+    assert "Unknown destination" in msg
 
 
 def test_spawn_repairs_invalid_room(oop_state):
@@ -386,15 +382,3 @@ def test_reset_reloads_default_and_static_data(oop_state):
     assert "rooms" in oop_state.data
     assert "items" in oop_state.data
     assert oop_state.running is True
-
-
-def test_state_message_falls_back_to_out(oop_state, monkeypatch):
-    output = []
-    monkeypatch.setattr(
-        state_oop, "out", lambda text="", end=None: output.append(str(text))
-    )
-    oop_state.render_room = None
-
-    oop_state.move({"target": "nowhere"})
-
-    assert output

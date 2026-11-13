@@ -2,6 +2,36 @@ from typing import Any
 
 from database import Database
 
+class SaveQuery:
+    def __init__(self, model: Database) -> None:
+        self.model = model
+        self.conditions: dict[str, Any] = {}
+
+    def where(self, **conditions: Any) -> "SaveQuery":
+        self.conditions.update(conditions)
+        return self
+
+    def first(self) -> dict[str, Any] | None:
+        sql = "SELECT * FROM saves"
+        if self.conditions:
+            sql += " WHERE " + " AND ".join(
+                f"{column} = ?" for column in self.conditions
+            )
+        with self.model.connection() as conn:
+            row = conn.execute(sql, tuple(self.conditions.values())).fetchone()
+        return dict(row) if row else None
+
+    def all(self) -> list[dict[str, Any]]:
+        """Return every matching save row, oldest first."""
+        sql = "SELECT * FROM saves"
+        if self.conditions:
+            sql += " WHERE " + " AND ".join(
+                f"{column} = ?" for column in self.conditions
+            )
+        sql += " ORDER BY id"
+        with self.model.connection() as conn:
+            rows = conn.execute(sql, tuple(self.conditions.values())).fetchall()
+        return [dict(row) for row in rows]
 
 class Save(Database):
     def __init__(self, data: dict | None = None) -> None:
@@ -29,36 +59,10 @@ class Save(Database):
             )
             return cur.lastrowid
 
-    def find(self, user_id: int | None = None) -> list[dict[str, Any]]:
-        """List a user's saves.
-
-
-        Returns:
-            Save rows as dicts (possibly empty), in insertion order.
-        """
-        if user_id:
-            self.user["id"] = user_id
-        with self.connection() as conn:
-            rows = conn.execute(
-                "SELECT * FROM saves WHERE user_id = ?", (self.user["id"],)
-            ).fetchall()
-        return [dict(row) for row in rows]
-
-    def find_unique(self, slot: str, user_id: int | None = None, ) -> dict[str, Any] | None:
-        """Find one save owned by a user.
-
-        Args:
-            user_id: Owning user's id.
-            slot: Save slot name.
+    def find(self) -> SaveQuery:
+        """Start a query over saves.
 
         Returns:
-            The save row as a ``dict``, or ``None`` if the user does not own that slot.
+            A query object supporting ``where``/``first``/``all``.
         """
-        if user_id:
-            self.user["id"] = user_id
-        with self.connection() as conn:
-            row = conn.execute(
-                "SELECT * FROM saves WHERE user_id = ? AND slot = ?",
-                (self.user["id"], slot),
-            ).fetchone()
-        return dict(row) if row else None
+        return SaveQuery(self)

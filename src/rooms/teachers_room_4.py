@@ -11,7 +11,6 @@ from rich.console import Console
 from rich.text import Text
 
 from src.room import Room
-from src.utils.display import clear
 from src.utils.shell import VirtualShell
 from src.utils.loader import loader
 from src.assets.nixos import nixos as nixos_logo
@@ -138,8 +137,7 @@ class TeachersRoomFour(Room):
         name = self.items.get("secret_key", {}).get("name", "Secret Key")
         write_output(f"[bold green]{name} added to your inventory![/]")
 
-    def run_shell(self, shell: VirtualShell, read_input=input, write_output=None,
-                  clear_screen=clear) -> None:
+    def run_shell(self, shell: VirtualShell, read_input=input, write_output=None) -> None:
         """Run the interactive read-execute loop until exit or interrupt.
 
         Command output is printed literally so shell text is never interpreted
@@ -164,7 +162,7 @@ class TeachersRoomFour(Room):
                 break
             result = shell.execute(raw)
             if result.clear_requested:
-                clear_screen()
+                self.clear()
             if result.output:
                 write_output(Text(result.output))
             if SECRET_PATH in result.read_paths:
@@ -199,10 +197,10 @@ class TeachersRoomFour(Room):
                 sequence=computer_sequence,
             )
             time.sleep(1)
-            clear()
+            self.clear()
             console.print(nixos_logo())
             time.sleep(2)
-            clear()
+            self.clear()
             console.print(
                 "Viola! you are half way in! Now explore the file system to see if you find anything interesting. "
                 "Type 'help' to list the available commands."
@@ -214,6 +212,6 @@ class TeachersRoomFour(Room):
         finally:
             self.auto()
             self.session["duration"]["pause"] = False
-            clear()
+            self.clear()
             self.render()
 

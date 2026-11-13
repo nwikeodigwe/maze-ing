@@ -102,7 +102,7 @@
         "items": ["api_usb"],
         "interactables": {
             "computer": "Nix OS computer",
-            "note": "On the note it says 'Explore the computer file system to see if you find anything interesting. \n hint: its super secret'"
+            "note": "On the note it says 'Explore the computer file system to see if you find anything interesting.\nhint: its super secret'"
         }
     },
     "lab_d2_001": {
