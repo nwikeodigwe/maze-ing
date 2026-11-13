@@ -27,6 +27,9 @@ langchain-openai>=1.7.2
 # Load environment variables from a .env file
 python-dotenv>=1.2.4
 
+# Job scheduler used by the background clock/autosave daemon
+schedule==1.2.2
+
 
 # ==============================================================================
 # CODE QUALITY, LINTING & TESTING
