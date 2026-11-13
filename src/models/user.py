@@ -55,22 +55,3 @@ class User(Database):
             A query object supporting ``where``/``first``.
         """
         return UserQuery(self)
-
-    def find_unique(self, data: dict) -> dict[str, Any] | None:
-        """Look a user up by numeric id or by name.
-
-        Args:
-            data: User data containing ``id`` and ``name``.
-
-        Returns:
-            The user row as a ``dict``, or ``None`` if no user matches.
-        """
-        if data:
-            self.data["name"] = data["name"]
-            self.data["id"] = data["id"]
-        with self.connection() as conn:
-            row = conn.execute(
-                "SELECT * FROM users WHERE id = ? OR name = ?",
-                (self.data["id"], self.data["name"]),
-            ).fetchone()
-            return dict(row) if row else None

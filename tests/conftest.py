@@ -18,23 +18,43 @@ from src.utils.shell import VirtualShell
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
 
+class FakeSavesQuery:
+    """Stand-in for :class:`src.models.save.SaveQuery`."""
+
+    def __init__(self, model):
+        self.model = model
+        self.conditions = {}
+
+    def where(self, **conditions):
+        self.conditions.update(conditions)
+        return self
+
+    def _matches(self, row):
+        return all(row.get(key) == value for key, value in self.conditions.items())
+
+    def first(self):
+        for row in self.model.rows:
+            if self._matches(row):
+                return dict(row)
+        return None
+
+    def all(self):
+        return [dict(row) for row in self.model.rows if self._matches(row)]
+
+
 class FakeSaves:
     """Stand-in for :class:`src.models.save.Save` that never touches SQLite."""
 
     def __init__(self):
         self.created = []
         self.rows = []
-        self.unique = {}
 
     def create(self, slot, user_id):
         self.created.append((slot, user_id))
         return len(self.created)
 
-    def find(self, user_id):
-        return list(self.rows)
-
-    def find_unique(self, slot, user_id):
-        return self.unique.get((slot, user_id))
+    def find(self):
+        return FakeSavesQuery(self)
 
 
 class FakeUserQuery:
@@ -151,7 +171,8 @@ def oop_state(tmp_path, monkeypatch):
 def oop_engine(oop_state, monkeypatch):
     monkeypatch.setattr(phase_oop, "Langchain", DummyLangchain)
     monkeypatch.setattr(lab_oop, "Scoreboard", FakeScoreboard)
-    engine = Engine(game_state=oop_state, color=Colors())
+    engine = Engine(color=Colors())
+    engine.state = oop_state
     engine.scoreboard = FakeScoreboard()
     engine.user = FakeUser()
     engine.outputs = []

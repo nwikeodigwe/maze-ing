@@ -4,7 +4,6 @@ import pytest
 
 import src.rooms.lab as lab_oop
 import src.rooms.teachers_room_4 as tr4_oop
-import src.phase as phase_oop
 import src.room as room_oop
 
 from src.rooms.front_desk import FrontDesk
@@ -235,7 +234,7 @@ def test_scoreboard_empty_and_populated(oop_engine):
     oop_engine.render_scoreboard()
 
     text = "\n".join(oop_engine.outputs)
-    assert "alice" in text
+    assert "Alice" in text
     assert "900" in text
     assert "Unknown (99)" in text
 
@@ -268,7 +267,7 @@ def test_shutdown_persists_and_stops(oop_engine):
         ("look", "render"),
         ("take", "take"),
         ("drop", "drop"),
-        ("go", "move"),
+        ("go", "navigate"),
     ],
 )
 def test_commands_dispatch(oop_engine, monkeypatch, verb, method):
@@ -317,23 +316,23 @@ def test_exploration_phase_handles_commands_and_invalid_input(
     oop_engine, monkeypatch
 ):
     commands = []
-    monkeypatch.setattr(phase_oop, "clear", lambda: None)
+    monkeypatch.setattr(oop_engine, "clear", lambda: None)
     monkeypatch.setattr(
         oop_engine, "commands", lambda verb, details: commands.append((verb, details))
     )
 
-    monkeypatch.setattr(phase_oop, "prompt", lambda *args: "status")
+    monkeypatch.setattr(oop_engine, "prompt", lambda *args: "status")
     oop_engine.exploration()
     assert commands[-1][0] == "status"
 
-    monkeypatch.setattr(phase_oop, "prompt", lambda *args: "zzz")
+    monkeypatch.setattr(oop_engine, "prompt", lambda *args: "zzz")
     oop_engine.exploration()
     assert commands[-1][0] == "UNKNOWN"
     assert any("Invalid input" in line for line in oop_engine.outputs)
 
 
 def test_assembly_phase_intro_and_commands(oop_engine, monkeypatch):
-    monkeypatch.setattr(phase_oop, "clear", lambda: None)
+    monkeypatch.setattr(oop_engine, "clear", lambda: None)
     rendered = []
     monkeypatch.setattr(
         oop_engine, "render_workbench", lambda text=None: rendered.append(text)
@@ -350,19 +349,19 @@ def test_assembly_phase_intro_and_commands(oop_engine, monkeypatch):
         oop_engine, "commands", lambda verb, details: commands.append(verb)
     )
     monkeypatch.setattr(oop_engine, "activate", lambda: activated.append(True))
-    monkeypatch.setattr(phase_oop, "prompt", lambda *args: "activate")
+    monkeypatch.setattr(oop_engine, "prompt", lambda *args: "activate")
 
     oop_engine.assembly()
     assert commands == ["activate"]
     assert activated == [True]
 
-    monkeypatch.setattr(phase_oop, "prompt", lambda *args: "zzz")
+    monkeypatch.setattr(oop_engine, "prompt", lambda *args: "zzz")
     oop_engine.assembly()
     assert any("Invalid input" in line for line in oop_engine.outputs)
 
 
 def test_chat_phase_intro_known_and_ai_input(oop_engine, monkeypatch):
-    monkeypatch.setattr(phase_oop, "clear", lambda: None)
+    monkeypatch.setattr(oop_engine, "clear", lambda: None)
     rendered = []
     monkeypatch.setattr(oop_engine, "render", lambda *args, **kwargs: rendered.append(args))
     oop_engine.session["phases"]["chat"]["activated"] = False
@@ -376,12 +375,12 @@ def test_chat_phase_intro_known_and_ai_input(oop_engine, monkeypatch):
         oop_engine, "commands", lambda verb, details: commands.append(verb)
     )
     oop_engine.session["phases"]["chat"]["activated"] = True
-    monkeypatch.setattr(phase_oop, "prompt", lambda *args: "status")
+    monkeypatch.setattr(oop_engine, "prompt", lambda *args: "status")
     oop_engine.chat()
     assert commands == ["status"]
 
     oop_engine.player["current_room"] = "lab_d2_001"
-    monkeypatch.setattr(phase_oop, "prompt", lambda *args: "hello robot")
+    monkeypatch.setattr(oop_engine, "prompt", lambda *args: "hello robot")
     oop_engine.chat()
     assert oop_engine.langchain.calls == ["hello robot"]
 
@@ -392,9 +391,9 @@ def test_chat_phase_intro_known_and_ai_input(oop_engine, monkeypatch):
 
 def test_lab_activate_success(oop_engine, monkeypatch):
     answers = iter(["Tr0janH0rse!", "Robo"])
-    monkeypatch.setattr(lab_oop, "prompt", lambda *args: next(answers))
+    monkeypatch.setattr(oop_engine, "prompt", lambda *args: next(answers))
     monkeypatch.setattr(lab_oop.time, "sleep", lambda seconds: None)
-    monkeypatch.setattr(lab_oop, "clear", lambda: None)
+    monkeypatch.setattr(oop_engine, "clear", lambda: None)
     oop_engine.player["current_room"] = "lab_d2_001"
     oop_engine.workbench["installed_parts"] = list(
         oop_engine.workbench["required_parts"]
@@ -417,8 +416,8 @@ def test_lab_activate_rejects_missing_parts_and_password(oop_engine, monkeypatch
     oop_engine.workbench["installed_parts"] = list(
         oop_engine.workbench["required_parts"]
     )
-    monkeypatch.setattr(lab_oop, "prompt", lambda *args: "wrong")
-    monkeypatch.setattr(lab_oop, "clear", lambda: None)
+    monkeypatch.setattr(oop_engine, "prompt", lambda *args: "wrong")
+    monkeypatch.setattr(oop_engine, "clear", lambda: None)
     oop_engine.activate()
     assert oop_engine.session["phase"] == "EXPLORATION"
     assert any("Invalid wifi" in line for line in oop_engine.outputs)
@@ -468,11 +467,11 @@ def test_teachers_room_four_secret_key_and_shell(oop_state, monkeypatch):
 
     cleared = []
     inputs = iter(["cat secret", "exit"])
+    room.clear = lambda: cleared.append(True)
     room.run_shell(
         FakeShell(),
         read_input=lambda prompt=None: next(inputs),
         write_output=messages.append,
-        clear_screen=lambda: cleared.append(True),
     )
     assert cleared == [True]
 
@@ -496,13 +495,12 @@ def test_teachers_room_four_handles_eof_and_computer(
         PromptShell(),
         read_input=eof,
         write_output=messages.append,
-        clear_screen=lambda: None,
     )
     assert messages
 
     monkeypatch.setattr(tr4_oop, "loader", lambda **kwargs: None)
     monkeypatch.setattr(tr4_oop.time, "sleep", lambda seconds: None)
-    monkeypatch.setattr(tr4_oop, "clear", lambda: None)
+    monkeypatch.setattr(room, "clear", lambda: None)
     monkeypatch.setattr(tr4_oop.console, "print", lambda *args, **kwargs: None)
     monkeypatch.setattr(room, "run_shell", lambda shell: messages.append("shell"))
     auto_calls = []
@@ -518,7 +516,7 @@ def test_teachers_room_four_handles_eof_and_computer(
 
 
 def test_room_base_render_and_output(oop_state, capsys):
-    room = room_oop.Room(game_state=oop_state)
+    room = room_oop.Room(state=oop_state)
     oop_state.player["current_room"] = "lobby"
 
     room.render(text="custom narrative")
@@ -529,7 +527,7 @@ def test_room_base_render_and_output(oop_state, capsys):
 
 
 def test_room_base_delegates_state_attributes(oop_state):
-    room = room_oop.Room(game_state=oop_state)
+    room = room_oop.Room(state=oop_state)
 
     assert room.player is oop_state.player
     assert room.session is oop_state.session
@@ -537,7 +535,7 @@ def test_room_base_delegates_state_attributes(oop_state):
 
 
 def test_room_base_missing_attribute_raises(oop_state):
-    room = room_oop.Room(game_state=oop_state)
+    room = room_oop.Room(state=oop_state)
 
     with pytest.raises(AttributeError):
         _ = room.does_not_exist
