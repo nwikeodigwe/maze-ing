@@ -92,6 +92,38 @@ def test_parse_register_generates_username(parser):
     )
 
 
+def test_register_retries_when_username_is_taken(parser, monkeypatch):
+    class FakeUser:
+        def __init__(self, results):
+            self.results = iter(results)
+
+        def find(self):
+            return self
+
+        def where(self, **kwargs):
+            return self
+
+        def first(self):
+            return next(self.results)
+
+    parser.user = FakeUser([object(), None])
+
+    class FakeRandom:
+        def __init__(self):
+            self.nums = iter([111, 222])
+
+        def choice(self, seq):
+            return seq[0]
+
+        def randint(self, low, high):
+            return next(self.nums)
+
+    monkeypatch.setattr("src.parser.random", FakeRandom())
+
+    verb, details = parser.parse("register")
+    assert details["target"] == "Operator_Aegis_222"
+
+
 @pytest.mark.parametrize(
     ("raw", "message_fragment"),
     [

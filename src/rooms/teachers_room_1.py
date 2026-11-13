@@ -1,12 +1,10 @@
 """Teachers Room 1: the keypad desk that holds the Level-1 staff keycard."""
 from src.room import Room
-from src.utils.colors import Colors
 
 
 class TeachersRoomOne(Room):
-    def __init__(self, color: Colors | None = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.color: Colors = color or Colors()
 
     def use_desk_code(self, item: str, target: str | None = None) -> None:
         """Try ``item`` as the desk code.

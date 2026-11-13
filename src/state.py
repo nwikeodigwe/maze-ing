@@ -11,7 +11,6 @@ from typing import Any
 
 from src.alias import Alias
 from src.models.save import Save
-from src.utils.display import colorize, out
 from src.utils.time import calculate_duration, parse_time_str
 from src.utils.colors import Colors
 
@@ -301,22 +300,11 @@ class State:
                 assembly_duration["last_write"] = now
                 self.session["phases"]["assembly"]["activated"] = True
 
-    def __message(self, text: str | None) -> None:
-        if self.render_room is not None:
-            self.render_room(text=text)
-        elif text:
-            out(text)
 
-    def save(self, details: Any = None) -> None:
+    def save(self, details: Any = None) -> tuple:
         """Write the current state to a named slot and register it in the database."""
         if not self.player.get("id"):
-            self.__message(
-                colorize(
-                    "You have to be registered and logged in to save, you can do this at the front desk",
-                    self.color.ERROR,
-                )
-            )
-            return None
+            return False, "You have to be registered and logged in to save, you can do this at the front desk"
 
         filename = details.get("target") if details else None
         if filename is None:
@@ -327,14 +315,12 @@ class State:
         save_path = os.path.join(self.SAVE_DIR, f"{filename}.json")
 
         if os.path.exists(save_path):
-            self.__message(colorize("An unexpected error occurred", self.color.ERROR))
-            return None
+            return False, "An unexpected error occurred"
 
         with open(save_path, "w", encoding="utf-8") as handle:
             json.dump(self.__snapshot(), handle, indent=4)
         self._saves.create(filename, self.player["id"])
-        self.__message(colorize(f"[system] Game saved to {filename}", self.color.SUCCESS))
-        return None
+        return True, f"[system] Game saved to {filename}"
 
     def list_saves(self) -> tuple:
         """Return the logged-in player's saves as ``(ok, rows_or_message)``.
@@ -345,9 +331,9 @@ class State:
         user_id = self.player.get("id")
         if not user_id:
             return False, "You have to register a profile to view saves. Go to the front desk!"
-        user_saves = self._saves.find(user_id)
-        if user_saves:
-            return True, user_saves
+        rows = self._saves.find().where(user_id=user_id).all()
+        if rows:
+            return True, rows
 
         return False, "You currently have no saved slot linked to your profile"
 
@@ -371,35 +357,18 @@ class State:
             self.player["current_room"] = room_id
         return room_id
 
-    def load(self, details: Any) -> None:
+    def load(self, details: Any) -> tuple:
         """Replace the active state with a save slot owned by the logged-in player."""
         slot = details["target"].removesuffix(".json")
         if not self.player.get("id"):
-            self.__message(
-                colorize(
-                    text="You have to register to load, go to the front desk",
-                    color_code=self.color.RED,
-                )
-            )
-            return None
-        if self._saves.find_unique(slot, self.player["id"]) is None:
-            self.__message(
-                colorize(
-                    text=f"You currently do not have any progress saved as '{slot}'",
-                    color_code=self.color.RED,
-                )
-            )
-            return None
+            return False, "You have to register to load, go to the front desk"
+
+        if self._saves.find().where(slot=slot, user_id=self.player["id"]).first() is None:
+            return False, f"You currently do not have any progress saved as '{slot}'"
 
         save_path = self.SAVE_DIR / f"{slot}.json"
         if not save_path.exists():
-            self.__message(
-                colorize(
-                    text=f"You currently have no saved progress as '{slot}'",
-                    color_code=self.color.RED,
-                )
-            )
-            return None
+            return False, f"You currently have no saved progress as '{slot}'"
 
         loaded = json.loads(save_path.read_text(encoding="utf-8"))
         self.data.clear()
@@ -410,51 +379,42 @@ class State:
         self.data.setdefault("terminal_width", 120)
         self.normalize_state()
         self.session["duration"]["last_write"] = datetime.now(timezone.utc).isoformat()
-        self.__message(colorize(f"Game loaded from {slot}", self.color.BRIGHT_GREEN))
-        return None
+        return True, f"Game loaded from {slot}"
 
-    def __history_back(self) -> None:
+    def __history_back(self) -> tuple:
         player = self.player
         history = player.setdefault("move", [])
         if not history:
-            self.__message(colorize("You have no previous room to go back to.", self.color.ERROR))
-            return None
+            return False, "You have no previous room to go back to."
         previous_room = history[-1]
         if previous_room not in self.rooms:
-            self.__message(colorize(f"Unknown destination '{previous_room}'.", self.color.ERROR))
-            return None
+            return False, f"Unknown destination '{previous_room}'."
         history.pop()
         player.setdefault("forward", []).append(player["current_room"])
         player["current_room"] = previous_room
-        self.__message(None)
-        return None
+        return True, None
 
-    def __history_forward(self) -> None:
+    def __history_forward(self) -> tuple:
         player = self.player
         forward = player.setdefault("forward", [])
         if not forward:
-            self.__message(colorize("You have no forward room to go to.", self.color.RED))
-            return None
+            return False, "You have no forward room to go to."
         next_room = forward[-1]
         if next_room not in self.rooms:
-            self.__message(colorize(f"Unknown destination '{next_room}'.", self.color.ERROR))
-            return None
+            return False, f"Unknown destination '{next_room}'."
         forward.pop()
         player.setdefault("move", []).append(player["current_room"])
         player["current_room"] = next_room
-        self.__message(None)
-        return None
+        return True, None
 
-    def move(self, details: Any) -> None:
+    def move(self, details: Any) -> tuple:
         """Move the player by direction, adjacent room name, or history."""
         destination = details["target"]
 
         if destination == "back":
-            self.__history_back()
-            return None
+            return self.__history_back()
         if destination == "forward":
-            self.__history_forward()
-            return None
+            return self.__history_forward()
 
         current_room = self.player["current_room"]
         room_data = self.rooms[current_room]
@@ -467,39 +427,21 @@ class State:
 
         if not target_id:
             adjacent = ", ".join(sorted(set(exits.values()))) or "nowhere"
-            self.__message(
-                colorize(
-                    text=f"You cannot go to {destination} from here. Adjacent: {adjacent}.",
-                    color_code=self.color.RED,
-                )
-            )
-            return None
+
+            return False, f"You cannot go to {destination} from here. Adjacent: {adjacent}."
 
         target_data = self.rooms.get(target_id)
         if not target_data:
-            self.__message(
-                colorize(
-                    text=f"Unknown destination '{target_id}'.",
-                    color_code=self.color.RED,
-                )
-            )
-            return None
+            return False, f"Unknown destination '{target_id}'."
 
         requires = target_data.get("requires")
         if requires and requires not in self.player["inventory"]:
-            self.__message(
-                colorize(
-                    text=f"The door is locked. Access requires: {requires}.",
-                    color_code=self.color.ERROR,
-                )
-            )
-            return None
+            return False, f"The door is locked. Access requires: {requires}."
+
         if target_data.get("restricted") and not requires:
-            self.__message(colorize(text="The door is locked.", color_code=self.color.ERROR))
-            return None
+            return False, "The door is locked."
 
         self.player["forward"].clear()
         self.player["current_room"] = target_id
         self.player["move"].append(current_room)
-        self.__message(None)
-        return None
+        return True, None

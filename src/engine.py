@@ -2,8 +2,7 @@ import textwrap
 
 from datetime import datetime, timezone
 from typing import Any
-
-from config import state
+from logger import logger
 from src.models.scoreboard import Scoreboard
 from src.models.user import User
 from src.phase import Phase
@@ -15,8 +14,6 @@ from src.rooms.teachers_room_2 import TeachersRoomTwo
 from src.rooms.teachers_room_4 import TeachersRoomFour
 from src.utils.colors import Colors
 from src.utils.time import format_timestamp
-from src.utils.display import out, colorize
-from src.state import State
 
 STATUS_FLAG_LABELS = {
     "fr1_user_registered": "Front desk registration",
@@ -28,14 +25,13 @@ STATUS_FLAG_LABELS = {
 }
 
 class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, TeachersRoomFour):
-    def __init__(self, game_state: State = state, color: Colors | None = None) -> None:
+    def __init__(self, color: Colors | None = None) -> None:
         super().__init__()
         self.scoreboard = Scoreboard()
         self.user = User()
         self.color = color or Colors()
-        self.state = game_state
         # State methods render feedback through the active engine's room view.
-        self.state.render_room = self.render
+        self.render_room = self.render
 
     def inventory(self) -> None:
         """Show carried items and how many assembly parts are held. Pauses the game clock."""
@@ -247,15 +243,17 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
 
     def shutdown(self) -> None:
         """Stop the main loop, print the final status screen and a farewell message."""
+        self.clear()
         self.status()
         self.persist()
-        self.running = False
+        self.state.running = False
         self.out(
             self.colorize(
                 text="Goodbye. see you again soon".center(self.terminal_width),
                 color_code=self.color.BRIGHT_GREEN
             )
         )
+        logger.info("Game ended")
         return None
 
     def register(self, details: Any) -> None:
@@ -378,16 +376,17 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
             user = self.user.find().where(id=entry["user_id"]).first()
             player_name = user["name"] if user else f"Unknown ({entry['user_id']})"
             rows.append((rank, player_name, entry))
+        header = (f"{'Rank':<6}{'Player':<20}{'Score':<20}"
+            f"{'Avg Room Time':<20}{'Exploration Time':<20}{'Assembly Time':<20}").upper()
+        self.out()
+        self.out(self.colorize(text=header, color_code=self.color.BRIGHT_WHITE + self.color.BOLD))
+        self.out(self.colorize(text='-' * len(header), color_code=self.color.DIM))
 
-        self.out(
-            f"{'Rank':<6}{'Player':<20}{'Score':>8}  "
-            f"{'Avg Room':<10}{'Exploration':<12}{'Assembly':<10}"
-        )
         for rank, player_name, entry in rows:
             self.out(
-                f"{rank:<6}{player_name:<20}{entry['score']:>8}  "
-                f"{entry['avg_room_time']:<10}{entry['exploration_time']:<12}"
-                f"{entry['assembly_time']:<10}"
+                f"{rank:<6}{player_name.title():<20}{entry['score']:<20}"
+                f"{entry['avg_room_time']:<20}{entry['exploration_time']:<20}"
+                f"{entry['assembly_time']:<20}"
             )
 
         return None
@@ -465,13 +464,13 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
         self.header(self.colorize("SAVED CHECKPOINTS", self.color.CYAN))
         ok, msg = self.list_saves()
         if not ok:
-            out(self.colorize(text=msg, color_code=self.color.BRIGHT_YELLOW + self.color.BOLD))
+            self.out(self.colorize(text=msg, color_code=self.color.BRIGHT_YELLOW + self.color.BOLD))
             return None
         for row in msg:
             date = format_timestamp(row["created_at"])
             space_needed = width - len(date) - len(row["slot"])
-            out(row["slot"], end=f"{' ' * space_needed}")
-            out(colorize(f"{date}", self.color.DIM))
+            self.out(row["slot"], end=f"{' ' * space_needed}")
+            self.out(self.colorize(f"{date}", self.color.DIM))
         return None
 
     def status(self) -> None:
@@ -551,6 +550,37 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
         self.out()
         return None
 
+    def save(self, details: Any) -> None:
+        """Persist progress and render the outcome."""
+        ok, msg = self.state.save(details)
+        self.render(
+            self.colorize(
+                text=msg,
+                color_code=self.color.SUCCESS if ok else self.color.ERROR,
+            )
+        )
+        return None
+
+    def load(self, details: Any) -> None:
+        """Restore a save slot and render the outcome."""
+        ok, msg = self.state.load(details)
+        self.render(
+            self.colorize(
+                text=msg,
+                color_code=self.color.SUCCESS if ok else self.color.ERROR,
+            )
+        )
+        return None
+
+    def navigate(self, details: Any) -> None:
+        ok, msg = self.move(details)
+        if ok:
+            self.render()
+            return None
+        self.render_room(self.colorize(text=msg, color_code=self.color.ERROR))
+        return None
+
+
     def commands(self, verb, details) -> None:
         """Dispatch a parsed command to its handler.
 
@@ -613,7 +643,7 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
             self.drop(details)
             return
         elif verb == "go":
-            self.move(details)
+            self.navigate(details)
             return
 
     def run(self) -> None:

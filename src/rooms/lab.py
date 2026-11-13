@@ -8,21 +8,34 @@ import time
 
 from src.models.scoreboard import Scoreboard
 from src.room import Room
-from src.utils.display import clear, prompt
 from src.utils.time import parse_time_str
-from src.utils.colors import Colors
-from src.utils.score import calculate_score
+from datetime import timedelta
 
 BASE_SCORE = 1000
 EXPLORATION_POINTS_PER_MINUTE = 12
 ASSEMBLY_POINTS_PER_MINUTE = 4
 
-
 class Lab(Room):
-    def __init__(self, color: Colors | None = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self.scoreboard = Scoreboard()
-        self.color: Colors = color or Colors()
+
+    def __calculate_score(self, exploration: timedelta, assembly: timedelta) -> int:
+        """Return a 0-1000 score; longer exploration and assembly times reduce it.
+
+        Args:
+            exploration: Time spent in the exploration phase.
+            assembly: Time spent in the assembly phase.
+
+        Returns:
+            ``BASE_SCORE`` minus the weighted time penalty, rounded and never below 0.
+        """
+        penalty = (
+                exploration.total_seconds() / 60 * EXPLORATION_POINTS_PER_MINUTE
+                + assembly.total_seconds() / 60 * ASSEMBLY_POINTS_PER_MINUTE
+        )
+        # Clamp so very slow runs bottom out at 0 instead of going negative.
+        return max(0, round(BASE_SCORE - penalty))
 
     def activate(self) -> None:
         """Run the activation sequence once all parts are installed.
@@ -43,15 +56,15 @@ class Lab(Room):
             )
             return None
         self.render_workbench(text="Enter wifi password to continue.")
-        password = prompt()
-        clear()
+        password = self.prompt()
+        self.clear()
         if password != self.session["phases"]["assembly"]["wifi_password"]:
             self.render_workbench(self.colorize(text="Invalid wifi credentials.", color_code=self.color.ERROR))
             return None
         self.render_workbench(
             text=f"Give your robot a name. Default name is {self.session['phases']['chat']['robot']['name']}."
         )
-        name = prompt()
+        name = self.prompt()
 
         user_id = self.player["id"]
         if user_id:
@@ -63,10 +76,11 @@ class Lab(Room):
             exploration = total - assembly
             # Guard against division by zero when computing the average time per room.
             room_count = len(self.rooms) or 1
+            avg_room_time = timedelta(seconds=(exploration // room_count).seconds)
             data = {
                 "user_id":user_id,
-                "score": calculate_score(exploration, assembly),
-                "avg_room_time":str(exploration / room_count),
+                "score": self.__calculate_score(exploration, assembly),
+                "avg_room_time":str(avg_room_time),
                 "exploration_time": str(exploration),
                 "assembly_time":str(assembly)
             }
@@ -75,7 +89,7 @@ class Lab(Room):
         robot = self.session["phases"]["chat"]["robot"]
         if name and name.strip():
             robot["name"] = name.strip()
-        clear()
+        self.clear()
         self.render(self.colorize(text=f"INITIALIZING {robot['name'].upper()}...", color_code=self.color.BRIGHT_GREEN))
         time.sleep(2)
         self.session["phase"] = "CHAT"
