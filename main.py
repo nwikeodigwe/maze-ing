@@ -8,7 +8,9 @@ main loop in :class:`src.engine.Engine` takes over until the player quits.
 import io
 import sys
 import config  # noqa: F401  (loads .env)
-import schedule, threading, time
+import schedule
+import threading
+import time
 
 from typing import cast
 
