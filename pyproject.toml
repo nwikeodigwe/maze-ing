@@ -30,8 +30,8 @@ pythonpath = ["."]
 testpaths = ["tests"]
 addopts = [
     "--cov=src",
-    "--cov=db",
     "--cov-report=term-missing",
+    "-ra -q",
 ]
 filterwarnings = [
     "ignore:_UnionGenericAlias is deprecated:DeprecationWarning",
@@ -39,7 +39,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 branch = true
-source = ["src", "db"]
+source = ["src"]
 omit = [
     "*/tests/*",
     "*/__init__.py",

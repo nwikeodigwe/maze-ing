@@ -3,7 +3,6 @@ from enum import Enum
 from src.langchain import Langchain
 from src.parser import Parser
 from src.room import Room
-from src.utils.display import clear, prompt
 from src.utils.colors import Colors
 
 
@@ -24,9 +23,9 @@ class Phase(Room):
 
     def exploration(self) -> None:
         """Run one exploration prompt cycle."""
-        raw = prompt()
+        raw = self.prompt()
         verb, details = self.parser.parse(raw)
-        clear()
+        self.clear()
         self.commands(verb, details)
         if verb in ("UNKNOWN", "INVALID", "EMPTY"):
             self.render(
@@ -40,7 +39,7 @@ class Phase(Room):
     def assembly(self) -> None:
         """Run one assembly-phase cycle."""
         if not self.session["phases"]["assembly"]["activated"]:
-            clear()
+            self.clear()
             self.render_workbench(
                 self.colorize(
                     "Build your dream robot. type 'activate' to begin activation",
@@ -49,9 +48,9 @@ class Phase(Room):
             )
             self.session["phases"]["assembly"]["activated"] = True
             return
-        raw = prompt()
+        raw = self.prompt()
         verb, details = self.parser.parse(raw)
-        clear()
+        self.clear()
         self.commands(verb, details)
         if verb == "activate":
             self.activate()
@@ -67,7 +66,7 @@ class Phase(Room):
     def chat(self) -> None:
         """Run one chat-phase cycle."""
         if not self.session["phases"]["chat"]["activated"]:
-            clear()
+            self.clear()
             self.render(
                 self.colorize(
                     f"Welcome to A-maze-ing-Delft chat mode! You can now freely talk to "
@@ -77,9 +76,9 @@ class Phase(Room):
             )
             self.session["phases"]["chat"]["activated"] = True
             return
-        raw = prompt()
+        raw = self.prompt()
         verb, details = self.parser.parse(raw)
-        clear()
+        self.clear()
         self.commands(verb, details)
         if (
             verb in ("UNKNOWN", "INVALID", "EMPTY")

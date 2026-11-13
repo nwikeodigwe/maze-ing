@@ -1,9 +1,14 @@
 import builtins
 import re
 
-from config import state
-from src.utils.display import clear, prompt, safe
+from src.state import State
+from database import Database
+from subprocess import run
 from src.utils.colors import Colors
+
+
+_DEFAULT_STATE = State()
+_DEFAULT_DATABASE = Database()
 
 
 class Room:
@@ -14,10 +19,10 @@ class Room:
     as ``self.auto()`` are available from every room and from ``Engine``.
     """
 
-    def __init__(self, game_state=None, make_safe=safe, colors = Colors) -> None:
-        self.state = game_state if game_state is not None else state
-        self.make_safe = make_safe
+    def __init__(self, state: State = _DEFAULT_STATE, colors = Colors, database: Database = _DEFAULT_DATABASE) -> None:
+        self.state = state
         self.color = colors()
+        self.database = database
         super().__init__()
 
     def __getattr__(self, name: str):
@@ -28,12 +33,58 @@ class Room:
             f"{type(self).__name__!r} object has no attribute {name!r}"
         )
 
-    # -- output helpers ---------------------------------------------------
+    def safe(self, text: str) -> str:
+        """Make ``text`` printable on a ``cp1252`` console.
+
+        Box-drawing and arrow characters are first transliterated to ASCII; any remaining unencodable character is
+        replaced with ``?`` rather than raising.
+
+        Args:
+            text: Text that may contain non-cp1252 characters.
+
+        Returns:
+            Text that can always be encoded as ``cp1252``.
+        """
+        # Transliterate the glyphs the game uses that cp1252 cannot encode.
+        table = str.maketrans({"─": "-", "═": "=", "•": "*", "→": "->", "←": "<-"})
+        text = text.translate(table)
+        try:
+            text.encode("cp1252")
+            return text
+        except UnicodeEncodeError:
+            return text.encode("cp1252", errors="replace").decode("cp1252")
+
     def clear(self) -> None:
-        clear()
+        """Clear the terminal screen (Windows/posix/PyCharm-safe)."""
+        try:
+            from rich.console import Console
+
+            Console().clear()
+        except ModuleNotFoundError:
+            import os
+
+            if os.getenv("PYCHARM_HOSTED"):
+                import builtins
+
+                builtins.print("\n" * 50)
+            else:
+                run(["cls" if os.name == "nt" else "clear"], shell=True)
 
     def prompt(self, message: str | None = None) -> str:
-        return prompt(message)
+        """Read one line of player input.
+
+        Args:
+            message: Optional label shown before the ``>`` marker. Defaults to a bare ``>`` prompt.
+
+        Returns:
+            The input with surrounding whitespace stripped.
+
+        Raises:
+            EOFError: If standard input is closed.
+        """
+        if message is None:
+            return input("\n> ").strip()
+        return input(f"\n{message} >").strip()
 
     def draw_line(self, char: str = "-") -> None:
         """Print a dimmed horizontal rule spanning the terminal width."""
@@ -41,11 +92,11 @@ class Room:
 
     def colorize(self, text: str, color_code: str) -> str:
         """Wrap ``text`` in an ANSI colour code and reset sequence."""
-        return f"{color_code}{text}\033[0m" if self.state.enable_colors else text
+        return f"{color_code}{text}{self.color.RESET}" if self.state.enable_colors else text
 
     def out(self, text: str = "", end: str | None = None) -> None:
         """Print ``text`` after making it safe for the console encoding."""
-        builtins.print(self.make_safe(text), end=end)
+        builtins.print(self.safe(text), end=end)
 
     def header(self, content: str | None = None) -> None:
         """Print the top banner: phase, location/custom title, name, time and pause marker."""

@@ -4,22 +4,21 @@ from database import Database
 from src.utils.time import parse_time_str
 
 
-def _total_time_seconds(entry: dict[str, Any]) -> float:
-    """Return exploration plus assembly time of a scoreboard row in seconds.
-
-    Args:
-        entry: Scoreboard row as a dict.
-    """
-    return (
-        parse_time_str(entry["exploration_time"]).total_seconds()
-        + parse_time_str(entry["assembly_time"]).total_seconds()
-    )
-
-
 class ScoreboardQuery:
     def __init__(self, model: Database) -> None:
         self.model = model
         self.conditions: dict[str, Any] = {}
+
+    def __total_time_seconds(self, entry: dict[str, Any]) -> float:
+        """Return exploration plus assembly time of a scoreboard row in seconds.
+
+        Args:
+            entry: Scoreboard row as a dict.
+        """
+        return (
+                parse_time_str(entry["exploration_time"]).total_seconds()
+                + parse_time_str(entry["assembly_time"]).total_seconds()
+        )
 
     def where(self, **conditions: Any) -> "ScoreboardQuery":
         self.conditions.update(conditions)
@@ -48,7 +47,7 @@ class ScoreboardQuery:
         entries.sort(
             key=lambda entry: (
                 -entry["score"],
-                _total_time_seconds(entry),
+                self.__total_time_seconds(entry),
                 entry["id"],
             )
         )
@@ -59,7 +58,7 @@ class Scoreboard(Database):
         """Insert a scoreboard row.
 
             Args:
-                data: Id of the player who finished the game.
+                data: data of the player who finished the game.
 
             Returns:
                 The new row id.
