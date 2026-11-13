@@ -13,10 +13,10 @@ class Mode(str, Enum):
 
 
 class Phase(Room):
-    def __init__(self, mode: Mode = Mode.EXPLORATION, color: Colors | None = None) -> None:
+    def __init__(self, phase: Mode = Mode.EXPLORATION, color: Colors | None = None) -> None:
         super().__init__()
         self.last_room_id: str | None = None
-        self.mode: Mode = mode
+        self.phase: Mode = phase
         self.parser = Parser()
         self.langchain = Langchain(provider="gemini")
         self.color: Colors = color or Colors()

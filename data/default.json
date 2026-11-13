@@ -1,4 +1,7 @@
 {
+    "running": true,
+    "enable_colors": true,
+    "terminal_width": 120,
     "player": {
         "id": null,
         "name": "guest",

@@ -649,15 +649,13 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
     def run(self) -> None:
         # Imported lazily to break the engine_functional <-> phase circular import.
         """Run the main game loop until ``state["running"]`` becomes false."""
-        self.player["current_room"] = self.spawn()
-        while self.running:
-            self.auto()
-            match self.session["phase"]:
-                case self.mode.EXPLORATION:
+        while self.state.running:
+            match self.state.session["phase"]:
+                case self.phase.EXPLORATION:
                     self.exploration()
-                case self.mode.ASSEMBLY:
+                case self.phase.ASSEMBLY:
                     self.assembly()
-                case self.mode.CHAT:
+                case self.phase.CHAT:
                     self.chat()
                 case _:
                     self.exploration()
