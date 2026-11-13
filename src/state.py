@@ -144,9 +144,6 @@ class State:
         # 2. Load the mutable state and merge in the static data files.
         self.data = json.loads(self.USER_STATE_PATH.read_text(encoding="utf-8"))
         self.__load_static()
-        self.data.setdefault("running", True)
-        self.data.setdefault("enable_colors", True)
-        self.data.setdefault("terminal_width", 120)
 
         self.help_commands[:] = json.loads(
             self.HELP_COMMANDS_PATH.read_text(encoding="utf-8")
@@ -346,16 +343,6 @@ class State:
                 if match:
                     numbers.append(int(match.group(1)))
         return f"{prefix}{max(numbers, default=0) + 1}"
-
-    def spawn(self) -> str:
-        """Return a valid room id for the player to start in."""
-        room_id = self.player["current_room"]
-        if not self.session.get("timestamp"):
-            self.session["timestamp"] = datetime.now(timezone.utc).isoformat()
-        if not isinstance(room_id, str) or room_id not in self.rooms:
-            room_id = next(iter(self.rooms), "lobby")
-            self.player["current_room"] = room_id
-        return room_id
 
     def load(self, details: Any) -> tuple:
         """Replace the active state with a save slot owned by the logged-in player."""

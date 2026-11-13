@@ -21,3 +21,4 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     filemode="a",  # 'a' to append (default), 'w' to overwrite each run
 )
+
