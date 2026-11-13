@@ -3,6 +3,7 @@ name = "a-maze-ing-delft"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "django-scheduler>=0.12.0",
     "langchain-core==1.6.13",
     "langchain-google-genai>=4.4.2",
     "langchain-groq>=1.1.3",

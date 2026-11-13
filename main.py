@@ -8,6 +8,7 @@ main loop in :class:`src.engine.Engine` takes over until the player quits.
 import io
 import sys
 import config  # noqa: F401  (loads .env)
+import schedule, threading, time
 
 from typing import cast
 
@@ -16,11 +17,19 @@ from src.room import Room
 from logger import logger
 
 cast(io.TextIOWrapper, sys.stdout).reconfigure(encoding="utf-8", errors="replace")
+room = Room()
+engine = Engine()
+
+def cron(main: Engine) -> None:
+    schedule.every(1).second.do(main.auto)
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+threading.Thread(target=cron, args=(engine,), daemon=True).start()
 
 if __name__ == "__main__":
     logger.info("Game started")
-    room = Room()
-    engine = Engine()
     try:
         room.render()
         engine.run()
