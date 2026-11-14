@@ -6,8 +6,8 @@ from collections.abc import Iterator
 
 
 class Database:
-    def __init__(self):
-        self.path = Path(__file__).parent / "data" / "game.db"
+    def __init__(self, path: Path | None = None):
+        self.path = path if path is not None else Path(__file__).parent / "data" / "game.db"
         self.__setup()
 
 
@@ -51,8 +51,9 @@ class Database:
             An open connection. The caller is responsible for closing it; prefer :func:`connection`.
         """
 
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(self.path)
+        path = db_path if db_path is not None else self.path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         return conn

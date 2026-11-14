@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 from database import Database
@@ -24,8 +25,8 @@ class UserQuery:
 
 
 class User(Database):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, path: Path | None = None) -> None:
+        super().__init__(path)
         self.data: dict[str, Any] = {"name": None, "id": None}
 
     def create(self, name: str | None = None) -> int | None:

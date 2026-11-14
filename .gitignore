@@ -5,7 +5,7 @@
 *.pyc
 .coverage/*
 data/saves/*
-data/session/user.json
+data/user.json
 docs/superpowers/*
 .superpowers
 specs/*

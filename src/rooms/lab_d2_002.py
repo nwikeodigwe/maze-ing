@@ -15,6 +15,7 @@ BASE_SCORE = 1000
 EXPLORATION_POINTS_PER_MINUTE = 12
 ASSEMBLY_POINTS_PER_MINUTE = 4
 
+
 class LabD2002(Room):
     def __init__(self) -> None:
         super().__init__()

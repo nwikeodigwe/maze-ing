@@ -131,7 +131,7 @@ class VirtualShell:
         if not tokens:
             return ShellResult()
         name, args = tokens[0], tokens[1:]
-        handler = getattr(self, f"_cmd_{name}", None)
+        handler = getattr(self, f"_cmd_{name.replace('-', '_')}", None)
         if handler is None:
             return ShellResult(output=f"bash: {name}: command not found")
         return handler(args)
@@ -700,7 +700,7 @@ class ServerShell:
             return self._run_sudo(args)
         if name in self._PRIVILEGED and self.state.session["user"] != "root":
             return ShellResult(output="Permission denied (are you root?)")
-        handler = getattr(self, f"_cmd_{name}", None)
+        handler = getattr(self, f"_cmd_{name.replace('-', '_')}", None)
         if handler is None:
             return ShellResult(output=f"bash: {name}: command not found")
         return handler(args)
@@ -719,7 +719,7 @@ class ServerShell:
         if not args:
             return ShellResult(output="sudo: no command given")
         name, rest = args[0], args[1:]
-        handler = getattr(self, f"_cmd_{name}", None)
+        handler = getattr(self, f"_cmd_{name.replace('-', '_')}", None)
         if handler is None:
             return ShellResult(output=f"bash: {name}: command not found")
         session = self.state.session

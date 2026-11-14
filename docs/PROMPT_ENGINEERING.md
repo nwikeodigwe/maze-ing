@@ -1,10 +1,10 @@
 # A-maze-ing-Delft - Prompt Engineering & AI Integration Specification
 
-This document defines the prompt engineering strategy, system prompt architecture, context window management, and OpenAI API configuration for Phase 3 (CHAT_MODE) of A-maze-ing-Delft.
+This document defines the prompt engineering strategy, system prompt architecture, context window management, and AI provider configuration for the CHAT phase of A-maze-ing-Delft.
 
 ## 1. System Prompt Architecture
 
-When the player completes the robot assembly in `lab_d2001` and executes `activate`, the engine initializes `src/client.py` and injects the master system prompt into the OpenAI Chat Completions payload.
+When the player completes the robot assembly in `lab_d2_002` and executes `activate`, the engine initializes `src/langchain.py` and folds the master system prompt into the chat model payload.
 
 > You are A-maze-ing-Delft (Autonomous Intellect & Generalized Interface System), a sentient artificial intelligence recently assembled from spare campus hardware by a student trapped in the Computer Science wing after hours.
 
@@ -20,33 +20,29 @@ When the player completes the robot assembly in `lab_d2001` and executes `activa
 2. **Concise Terminal Output:** Keep responses under 3–4 sentences per turn unless explicitly asked for technical logs or detailed plans. Terminal screen real estate is limited.
 3. **Goal Orientation:** Actively assist the player with analytical advice, technical explanations, or ideas on how to override building security to escape.
 
-## 2. OpenAI API Configuration
+## 2. AI Provider Configuration
 
-`src/client.py` uses the official OpenAI Python SDK (`openai>=1.0.0`) with streaming enabled to provide an authentic, token-by-token terminal printing effect.
+`src/langchain.py` builds its chat model through LangChain, trying providers in order and falling
+back when an API key is missing:
 
-| Parameter   | Recommended Setting         | Rationale                                                                                              |
-| ----------- | --------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Model       | `gpt-4o-mini` (or `gpt-4o`) | `gpt-4o-mini` offers near-instant latency and lower API costs while maintaining high persona fidelity. |
-| Temperature | `0.7`                       | Provides creative, engaging dialogue without causing erratic formatting or hallucinating game rules.   |
-| Max Tokens  | `200`                       | Enforces short, readable terminal outputs per interaction turn.                                        |
-| Top P       | `0.9`                       | Ensures consistent tone while allowing natural word choices.                                           |
-| Stream      | `True`                      | Delivers real-time token streaming to standard output (`sys.stdout.write`).                            |
+1. **ollama** (local, default) — `ChatOllama`, no key required.
+2. **groq** — `ChatGroq`, requires `GROQ_API_KEY`.
+3. **gemini** — `ChatGoogleGenerativeAI`, requires `GEMINI_API_KEY`.
+4. **openai** — `ChatOpenAI`, requires `OPENAI_API_KEY`.
+
+Streaming is enabled so replies print token-by-token through `respond()`.
 
 ## 3. Context Window & History Management
 
-To prevent token cost escalation and stay within model context bounds during extended chat sessions, `src/client.py` implements a rolling window truncation algorithm.
+To prevent token cost escalation and stay within model context bounds during extended chat sessions, `src/langchain.py` trims the rolling history after every exchange.
 
 ### Trimming Strategy
 
-- **Preserve System Prompt:** Element `history[0]` (the system prompt) is never removed.
-- **Rolling Buffer:** Retain only the last 10 message turns (5 user inputs + 5 assistant outputs).
-- **Buffer Trimming Implementation:**
+- **Rolling Buffer:** `_MAX_HISTORY = 10` — only the most recent exchanges are retained.
+- **Buffer Trimming Implementation** (in `stream`):
 
 ```python
-def prune_history(self, max_turns: int = 10) -> None:
-    # Retain system prompt at index 0, prune oldest turns exceeding max_turns
-    if len(self.history) > (max_turns + 1):
-        self.history = [self.history[0]] + self.history[-max_turns:]
+self._history[:] = self._history[-self._MAX_HISTORY:]
 ```
 
 ## 4. Guardrails & Prompt Injection Prevention
@@ -67,12 +63,6 @@ Players may attempt to "jailbreak" A-maze-ing-Delft by typing inputs like:
 
 ## 5. Offline Fallback Mode (Simulated AI)
 
-If `OPENAI_API_KEY` is missing from `.env` or network connectivity fails, the engine falls back to `Simulated AI Mode` so the game remains beatable without crashing.
-
-```python
-FALLBACK_RESPONSES = [
-    "A-maze-ing-Delft > Neural link stable. Optical sensors report Lab D 2001 is secure. How can I assist with our escape plan?",
-    "A-maze-ing-Delft > Battery output holding at 98%. I am analyzing the building's electronic door locks now.",
-    "A-maze-ing-Delft > Campus network 'CS_LAB_NET' connected. I'm ready to follow your commands, Creator."
-]
-```
+If no provider can be created (no API keys set, or the local model fails), `stream()` falls back
+to `_mock()`, a canned offline reply that streams word by word, so the game remains beatable
+without crashing.
