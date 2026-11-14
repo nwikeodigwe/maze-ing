@@ -91,3 +91,5 @@ WHEN YOU ARE DONE
 The lab awards the Server Provisioning Certificate and puts the robot
 on standby. Your progress is saved, so you can leave and return to the
 terminal without losing any work.
+
+Good luck!

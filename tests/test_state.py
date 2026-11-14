@@ -45,6 +45,16 @@ def test_normalize_backfills_the_new_flag_and_item(oop_state):
     )
 
 
+def test_room_descriptions_are_unique_and_present(oop_state):
+    descriptions = [room.get("description") for room in oop_state.rooms.values()]
+
+    assert len(descriptions) == len(oop_state.rooms)
+    assert all(desc and desc.strip() for desc in descriptions)
+    assert len(set(descriptions)) == len(descriptions), (
+        "two rooms share the same copy-pasted description"
+    )
+
+
 def test_mapping_protocol_and_properties(oop_state):
     state = oop_state
     assert state["player"] is state.player
