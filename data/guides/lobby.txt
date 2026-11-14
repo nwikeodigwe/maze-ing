@@ -1,0 +1,30 @@
+When all the syntactic and semantic errors have been removed from the program, the compiler then
+proceeds to take each statement of the program and translate it into a “lower” form. On most systems,
+this means that each statement is translated by the compiler into the equivalent statement or statements
+in assembly language needed to perform the identical task.
+
+After the program has been translated into an equivalent assembly language program, the next step in the
+compilation process is to translate the assembly language statements into actual machine instructions.
+This step might or might not involve the execution of a separate program known as an assembler. On most
+systems, the assembler is executed automatically as part of the compilation process.
+
+The assembler takes each assembly language statement and converts it into a binary format known as object code,
+which is then written into another file on the system. This file typically has the same name as the source file
+under Unix, with the last letter an “o” (for object) instead of a “c”. Under Windows, the suffix letters “obj"
+typically replace the “c” in the filename.
+
+After the program has been translated into object code, it is ready to be linked. This process is once again
+performed automatically whenever the cc or gcc command is issued under Unix. The purpose of the linking phase
+is to get the program into a final form for execution on the computer. If the program uses other programs that
+were previously processed by the compiler, then during this phase the programs are linked together. Programs
+that are used from the system’s program library are also searched and linked together with the object program
+during this phase.
+
+The entire process of compiling and linking a program is often called building.
+
+The final linked file, which is in an executable object code format, is stored in another file on the system,
+ready to be run or executed. Under Unix, this file is called a.out by default. Under Windows, the executable
+file usually has the same name as the source file, with the c extension replaced by an exe extension.
+
+To subsequently execute the program, all you do is type in the name of the executable object file. So, the
+command
