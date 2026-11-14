@@ -668,13 +668,7 @@ class ServerShell:
             known_hosts = self.state.system.setdefault("known_hosts", [])
             if host not in known_hosts:
                 known_hosts.append(host)
-            session = self.state.session
-            session["connected_via_ssh"] = True
-            session["machine"] = SERVER_HOSTNAME
-            session["user"] = "root"
-            session["cwd"] = "/root"
-            session["prompt_symbol"] = "#"
-            return ShellResult()
+            return self._connect(pending.get("user", "root"), pending.get("key"))
         if answer == "no":
             return ShellResult(output=f"Connection to {host} closed.")
         return ShellResult(prompt="Please type 'yes', 'no' or the fingerprint: ")
@@ -840,3 +834,387 @@ class ServerShell:
         session["prompt_symbol"] = "$"
         session["connected_via_ssh"] = False
         return ShellResult(output="Connection to maze-server closed.")
+
+    # -- remote access -----------------------------------------------------
+
+    def _cmd_ssh(self, args: list[str]) -> ShellResult:
+        """Connect to the server over SSH."""
+        key = None
+        port = None
+        target = None
+        index = 0
+        while index < len(args):
+            arg = args[index]
+            if arg == "-i" and index + 1 < len(args):
+                key = args[index + 1]
+                index += 2
+                continue
+            if arg == "-p" and index + 1 < len(args):
+                port = args[index + 1]
+                index += 2
+                continue
+            if arg.startswith("-"):
+                return ShellResult(output=f"ssh: invalid option -- '{arg[1]}'")
+            target = arg
+            index += 1
+        if target is None or "@" not in target:
+            return ShellResult(output="ssh: no hostname given")
+        user, host = target.split("@", 1)
+        if host != SERVER_IP:
+            return ShellResult(
+                output=(
+                    f"ssh: connect to host {host} port {port or 22}: "
+                    "Connection timed out"
+                )
+            )
+        key_path = self._resolve(key) if key else ""
+        if not key or self._node(key_path) is None:
+            return ShellResult(output=f"{user}@{host}: Permission denied (publickey).")
+        if not self._ssh_allows(user):
+            return ShellResult(output=f"{user}@{host}: Permission denied (publickey).")
+        if host not in self.state.system.get("known_hosts", []):
+            self.state.session["pending_prompt"] = {
+                "kind": "ssh_host_key",
+                "host": host,
+                "user": user,
+                "key": key_path,
+            }
+            return ShellResult(
+                prompt=(
+                    f"The authenticity of host '{host} ({host})' can't be established.\n"
+                    "ED25519 key fingerprint is "
+                    "SHA256:x7k9LmP2qR8vN1wZ4yB6cF0jH3dG5sA8tE9uI2oP4lM.\n"
+                    "Are you sure you want to continue connecting "
+                    "(yes/no/[fingerprint])? "
+                )
+            )
+        return self._connect(user, key_path)
+
+    def _ssh_allows(self, user: str) -> bool:
+        """True when the sshd configuration still lets this user in."""
+        parsed = self.state.filesystem.get("/etc/ssh/sshd_config", {}).get("parsed", {})
+        entry = self.state.system.get("users", {}).get(user)
+        if entry is None:
+            return False
+        if user == "root" and parsed.get("PermitRootLogin") == "no":
+            return False
+        return bool(entry.get("has_ssh_key"))
+
+    def _connect(self, user: str, key_path: str | None = None) -> ShellResult:
+        """Switch the session onto the server as ``user``.
+
+        The key used to connect is authorised on the server, so it can be copied
+        to another account later.
+        """
+        session = self.state.session
+        session["connected_via_ssh"] = True
+        session["machine"] = SERVER_HOSTNAME
+        session["user"] = user
+        session["cwd"] = "/root" if user == "root" else f"/home/{user}"
+        session["prompt_symbol"] = "#" if user == "root" else "$"
+        if key_path:
+            key_node = self._node(key_path)
+            authorized = self._node("/root/.ssh/authorized_keys")
+            if key_node is not None and authorized is not None:
+                content = authorized.get("content", "")
+                if key_node.get("content", "") not in content:
+                    authorized["content"] = content + key_node.get("content", "")
+        return ShellResult()
+
+    def _cmd_su(self, args: list[str]) -> ShellResult:
+        """Switch to another user."""
+        name = None
+        for arg in args:
+            if arg == "-":
+                continue
+            name = arg
+        if name is None:
+            name = "root"
+        if name not in self.state.system.get("users", {}):
+            return ShellResult(output=f"su: user '{name}' does not exist")
+        session = self.state.session
+        session["user"] = name
+        session["cwd"] = "/root" if name == "root" else f"/home/{name}"
+        session["prompt_symbol"] = "#" if name == "root" else "$"
+        return ShellResult()
+
+    # -- packages and users ------------------------------------------------
+
+    def _cmd_apt(self, args: list[str]) -> ShellResult:
+        """Update or install system packages."""
+        if not args:
+            return ShellResult(output="apt: no operation specified")
+        operation, rest = args[0], args[1:]
+        system = self.state.system
+        if operation in ("update", "refresh"):
+            system["pkg_index_updated"] = True
+            return ShellResult(
+                output=(
+                    "Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease\n"
+                    "Get:2 http://archive.ubuntu.com/ubuntu jammy-updates InRelease"
+                )
+            )
+        if operation == "upgrade":
+            if not system.get("pkg_index_updated"):
+                return ShellResult(output="0 upgraded, 0 newly installed, 0 to remove")
+            if "-y" in rest or "--yes" in rest:
+                system["pkg_upgraded"] = True
+                return ShellResult(
+                    output=(
+                        "Calculating upgrade... Done\n"
+                        "0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded."
+                    )
+                )
+            self.state.session["pending_prompt"] = {"kind": "apt_confirm"}
+            return ShellResult(prompt="Do you want to continue? [Y/n] ")
+        if operation == "install":
+            packages = [arg for arg in rest if not arg.startswith("-")]
+            if not packages:
+                return ShellResult(output="apt: no packages specified")
+            for package in packages:
+                if package != "nginx":
+                    return ShellResult(output=f"E: Unable to locate package {package}")
+            system["services"]["nginx"]["installed"] = True
+            return ShellResult(
+                output=(
+                    "Setting up nginx (1.18.0-6ubuntu14.3) ...\n"
+                    "Processing triggers for man-db (2.10.2-1) ..."
+                )
+            )
+        return ShellResult(output=f"apt: invalid operation '{operation}'")
+
+    _cmd_apt_get = _cmd_apt
+
+    def _answer_apt_confirm(self, text: str, pending: dict) -> ShellResult:
+        """Resolve the package-upgrade confirmation prompt."""
+        if text.strip().lower() in ("", "y", "yes"):
+            self.state.system["pkg_upgraded"] = True
+            return ShellResult(
+                output=(
+                    "Calculating upgrade... Done\n"
+                    "0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded."
+                )
+            )
+        return ShellResult(output="Abort.")
+
+    def _cmd_adduser(self, args: list[str]) -> ShellResult:
+        """Create a user account."""
+        if not args:
+            return ShellResult(output="adduser: no username specified")
+        if len(args) > 1:
+            return ShellResult(output="adduser: Only one or two names allowed.")
+        name = args[0]
+        users = self.state.system.setdefault("users", {})
+        if name in users:
+            return ShellResult(output=f"adduser: user '{name}' already exists")
+        users[name] = {"sudo": False, "has_ssh_key": False}
+        if self.state.system.get("admin_user") is None:
+            self.state.system["admin_user"] = name
+        home = f"/home/{name}"
+        self.state.filesystem.setdefault(
+            home, {"type": "dir", "perms": "755", "owner": f"{name}:{name}"}
+        )
+        self.state.filesystem.setdefault(
+            f"{home}/.ssh", {"type": "dir", "perms": "700", "owner": f"{name}:{name}"}
+        )
+        self.state.session["pending_prompt"] = {
+            "kind": "adduser_password",
+            "user": name,
+            "stage": "password",
+        }
+        return ShellResult(prompt="New password: ")
+
+    def _answer_adduser_password(self, text: str, pending: dict) -> ShellResult:
+        """Resolve the adduser password and confirmation prompts."""
+        stage = pending.get("stage", "password")
+        name = pending.get("user", "")
+        if stage == "password":
+            if not text:
+                return ShellResult(prompt="New password: ")
+            pending["password"] = text
+            pending["stage"] = "retype"
+            return ShellResult(prompt="Retype new password: ")
+        if stage == "retype":
+            if text != pending.get("password"):
+                pending["stage"] = "password"
+                return ShellResult(prompt="New password: ")
+            pending["stage"] = "confirm"
+            return ShellResult(prompt="Is the information correct? [Y/n] ")
+        if text.strip().lower() in ("", "y", "yes"):
+            return ShellResult(output=f"useradd: user '{name}' created with home directory")
+        self.state.system.get("users", {}).pop(name, None)
+        if self.state.system.get("admin_user") == name:
+            self.state.system["admin_user"] = None
+        return ShellResult(output="adduser: cancelled")
+
+    def _cmd_usermod(self, args: list[str]) -> ShellResult:
+        """Change a user's group memberships."""
+        users = self.state.system.get("users", {})
+        append = False
+        group = None
+        name = None
+        index = 0
+        while index < len(args):
+            arg = args[index]
+            if arg == "-a":
+                append = True
+            elif arg == "-aG":
+                append = True
+                if index + 1 < len(args):
+                    group = args[index + 1]
+                    index += 1
+            elif arg == "-G":
+                if index + 1 < len(args):
+                    group = args[index + 1]
+                    index += 1
+            elif arg.startswith("-"):
+                return ShellResult(output=f"usermod: invalid option -- '{arg[1]}'")
+            else:
+                name = arg
+            index += 1
+        if name is None:
+            return ShellResult(output="usermod: no user specified")
+        if name not in users:
+            return ShellResult(output=f"usermod: user '{name}' does not exist")
+        if group != "sudo":
+            return ShellResult(output="usermod: only the sudo group is supported")
+        if not append:
+            return ShellResult(
+                output=(
+                    "usermod: warning 'G' group memberships overwritten; "
+                    "use -a to append"
+                )
+            )
+        users[name]["sudo"] = True
+        return ShellResult()
+
+    def _cmd_rsync(self, args: list[str]) -> ShellResult:
+        """Copy a home directory's .ssh folder to another account."""
+        owner = None
+        paths: list[str] = []
+        for arg in args:
+            if arg.startswith("--chown="):
+                owner = arg.split("=", 1)[1]
+            elif arg.startswith("-"):
+                continue
+            else:
+                paths.append(arg)
+        if len(paths) < 2:
+            return ShellResult(output="rsync: missing destination")
+        source, destination = paths[0], paths[1]
+        source_path = self._resolve(source)
+        if not source_path.endswith("/.ssh") or not self._is_dir(source_path):
+            return ShellResult(output="rsync: unsupported source path")
+        target = owner.split(":")[0] if owner else destination.rstrip("/").rsplit("/", 1)[-1]
+        users = self.state.system.get("users", {})
+        if target not in users:
+            return ShellResult(output=f"rsync: chown: user '{target}' does not exist")
+        destination_ssh = posixpath.join(self._resolve(destination), ".ssh")
+        self.state.filesystem.setdefault(
+            destination_ssh,
+            {"type": "dir", "perms": "700", "owner": f"{target}:{target}"},
+        )
+        copied = 0
+        for name in self._children(source_path):
+            node = self._node(posixpath.join(source_path, name))
+            if node is None:
+                continue
+            new_node = dict(node)
+            new_node["owner"] = owner or f"{target}:{target}"
+            self.state.filesystem[posixpath.join(destination_ssh, name)] = new_node
+            copied += 1
+        users[target]["has_ssh_key"] = True
+        return ShellResult(output=f"sent {copied} bytes  received 12 bytes  total 15 bytes")
+
+    # -- services ----------------------------------------------------------
+
+    def _cmd_systemctl(self, args: list[str]) -> ShellResult:
+        """Enable, start, restart, reload or query a systemd service."""
+        start_now = "--now" in args
+        words = [arg for arg in args if arg != "--now"]
+        if not words:
+            return ShellResult(output="systemctl: no operation specified")
+        action = words[0]
+        if len(words) < 2:
+            return ShellResult(output="systemctl: no unit specified")
+        unit = words[1]
+        services = self.state.system.get("services", {})
+        service = services.get(unit)
+        if service is None:
+            return ShellResult(
+                output=f"Failed to {action} {unit}: Unit {unit}.service not found."
+            )
+        if unit == "sshd":
+            parsed = self.state.filesystem.get("/etc/ssh/sshd_config", {}).get("parsed", {})
+            if action in ("reload", "restart") and not parsed.get("syntax_valid"):
+                return ShellResult(
+                    output=(
+                        "Job for ssh.service failed because the control process "
+                        "exited with error code."
+                    )
+                )
+            if action == "enable":
+                service["enabled"] = True
+                if start_now:
+                    service["running"] = True
+            elif action in ("start", "restart", "reload"):
+                service["running"] = True
+                service["port"] = parsed.get("Port", service.get("port", 22))
+            elif action == "status":
+                return self._service_status(unit, service)
+            return ShellResult()
+        if unit == "nginx":
+            site = self.state.filesystem.get("/etc/nginx/sites-available/app", {}).get(
+                "parsed", {}
+            )
+            if action in ("reload", "restart", "start") and not site.get(
+                "syntax_valid", True
+            ):
+                return ShellResult(
+                    output=(
+                        "Job for nginx.service failed because the control process "
+                        "exited with error code."
+                    )
+                )
+            if action == "enable":
+                service["enabled"] = True
+                if start_now:
+                    service["running"] = True
+            elif action in ("start", "restart", "reload"):
+                service["running"] = True
+            elif action == "status":
+                return self._service_status(unit, service)
+            return ShellResult()
+        return ShellResult(output=f"Failed to {action} {unit}: Unit {unit}.service not found.")
+
+    def _service_status(self, unit: str, service: dict) -> ShellResult:
+        """Report a service's status and record the health check."""
+        if service.get("running"):
+            self.state.system["health_verified"]["service_status_checked"] = True
+            return ShellResult(
+                output=(
+                    f"● {unit}.service - {unit} service\n"
+                    "     Loaded: loaded (/lib/systemd/system/"
+                    f"{unit}.service; enabled)\n"
+                    "     Active: active (running)"
+                )
+            )
+        return ShellResult(
+            output=(
+                f"● {unit}.service - {unit} service\n"
+                "     Loaded: loaded (/lib/systemd/system/"
+                f"{unit}.service; disabled)\n"
+                "     Active: inactive (dead)"
+            )
+        )
+
+    def _cmd_sshd(self, args: list[str]) -> ShellResult:
+        """Validate the sshd configuration."""
+        if "-t" not in args:
+            return ShellResult(output="usage: sshd -t")
+        parsed = self.state.filesystem.get("/etc/ssh/sshd_config", {}).get("parsed", {})
+        if parsed.get("syntax_valid"):
+            return ShellResult()
+        return ShellResult(
+            output="sshd: /etc/ssh/sshd_config: line 3: Bad configuration option"
+        )

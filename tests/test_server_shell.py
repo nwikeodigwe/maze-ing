@@ -120,3 +120,116 @@ def test_a_command_answers_the_pending_prompt(shell):
     shell.execute("yes")
 
     assert shell.state.session["connected_via_ssh"] is True
+
+
+def _connected_shell(shell):
+    """Connect the shell to the server, accepting the host key."""
+    shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.42")
+    shell.answer("yes")
+    return shell
+
+def test_ssh_to_the_server_prompts_for_the_host_key(shell):
+    result = shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.42")
+    assert result.prompt is not None
+    assert "Are you sure you want to continue connecting" in result.prompt
+    assert shell.state.session["connected_via_ssh"] is False
+
+
+def test_answering_yes_accepts_the_host_key(shell):
+    shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.42")
+    shell.answer("yes")
+    assert shell.state.session["connected_via_ssh"] is True
+    assert shell.state.session["machine"] == "maze-server"
+    assert shell.state.session["user"] == "root"
+    assert shell.state.session["cwd"] == "/root"
+    assert shell.state.session["prompt_symbol"] == "#"
+    assert "10.11.7.42" in shell.state.system["known_hosts"]
+
+
+def test_typing_y_reprompts_for_the_full_word(shell):
+    shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.42")
+    result = shell.answer("y")
+    assert result.prompt is not None
+    assert "Please type 'yes', 'no' or the fingerprint" in result.prompt
+
+
+def test_ssh_without_a_key_is_denied(shell):
+    result = shell.execute("ssh root@10.11.7.42")
+    assert result.output == "root@10.11.7.42: Permission denied (publickey)."
+
+
+def test_ssh_to_the_wrong_address_times_out(shell):
+    result = shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.99")
+    assert result.output == "ssh: connect to host 10.11.7.99 port 22: Connection timed out"
+
+
+def test_apt_update_and_upgrade(shell):
+    _connected_shell(shell)
+    shell.execute("apt update")
+    assert shell.state.system["pkg_index_updated"] is True
+    shell.execute("apt upgrade -y")
+    assert shell.state.system["pkg_upgraded"] is True
+
+
+def test_apt_upgrade_before_update_does_not_satisfy_the_step(shell):
+    _connected_shell(shell)
+    result = shell.execute("apt upgrade")
+    assert result.output == "0 upgraded, 0 newly installed, 0 to remove"
+    assert shell.state.system["pkg_upgraded"] is False
+
+
+def test_apt_upgrade_without_yes_prompts_for_confirmation(shell):
+    _connected_shell(shell)
+    shell.execute("apt update")
+    result = shell.execute("apt upgrade")
+    assert result.prompt is not None
+    assert "Do you want to continue?" in result.prompt
+    shell.answer("y")
+    assert shell.state.system["pkg_upgraded"] is True
+
+
+def test_adduser_and_usermod_and_key_copy(shell):
+    _connected_shell(shell)
+    shell.execute("adduser maze-admin")
+    shell.answer("secret")
+    shell.answer("secret")
+    shell.answer("")
+    assert shell.state.system["users"]["maze-admin"]["sudo"] is False
+
+    shell.execute("usermod -aG sudo maze-admin")
+    assert shell.state.system["users"]["maze-admin"]["sudo"] is True
+
+    shell.execute("rsync --archive --chown=maze-admin:maze-admin ~/.ssh /home/maze-admin")
+    assert shell.state.system["users"]["maze-admin"]["has_ssh_key"] is True
+    assert shell.state.system["admin_user"] == "maze-admin"
+
+
+def test_usermod_without_a_flag_warns(shell):
+    _connected_shell(shell)
+    shell.execute("adduser maze-admin")
+    shell.answer("secret")
+    shell.answer("secret")
+    shell.answer("")
+    result = shell.execute("usermod -G sudo maze-admin")
+    assert "usermod" in result.output
+    assert shell.state.system["users"]["maze-admin"]["sudo"] is False
+
+
+def test_systemctl_reload_sshd_requires_valid_syntax(shell):
+    _connected_shell(shell)
+    shell.state.filesystem["/etc/ssh/sshd_config"]["parsed"]["syntax_valid"] = False
+    result = shell.execute("systemctl reload sshd")
+    assert result.output == (
+        "Job for ssh.service failed because the control process exited with error code."
+    )
+
+
+def test_ssh_lockout_blocks_a_later_connection(shell):
+    _connected_shell(shell)
+    shell.state.filesystem["/etc/ssh/sshd_config"]["parsed"].update(
+        {"PermitRootLogin": "no", "PasswordAuthentication": "no"}
+    )
+    shell.execute("systemctl reload sshd")
+    shell.execute("exit")
+    result = shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.42")
+    assert "Permission denied" in result.output
