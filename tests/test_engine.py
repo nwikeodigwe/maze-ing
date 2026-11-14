@@ -429,6 +429,7 @@ def test_lab_activate_success(oop_engine, monkeypatch):
     oop_engine.workbench["installed_parts"] = list(
         oop_engine.workbench["required_parts"]
     )
+    oop_engine.flags["lab_server_provisioned"] = True
 
     oop_engine.activate()
 
@@ -447,6 +448,7 @@ def test_lab_activate_rejects_missing_parts_and_password(oop_engine, monkeypatch
     oop_engine.workbench["installed_parts"] = list(
         oop_engine.workbench["required_parts"]
     )
+    oop_engine.flags["lab_server_provisioned"] = True
     monkeypatch.setattr(oop_engine, "prompt", lambda *args: "wrong")
     monkeypatch.setattr(oop_engine, "clear", lambda: None)
     oop_engine.activate()
@@ -644,3 +646,41 @@ def test_inspect_server_runs_the_terminal_session(oop_engine, monkeypatch):
     # The terminal session is not charged to the player, and the clock resumes.
     assert oop_engine.session["duration"]["value"] == "0:05:00"
     assert oop_engine.session["duration"]["pause"] is False
+
+def test_award_sets_the_flag_and_grants_the_certificate(oop_engine):
+    oop_engine._award_provisioning_certificate()
+
+    assert oop_engine.flags["lab_server_provisioned"] is True
+    assert "server_provisioning_certificate" in oop_engine.player["inventory"]
+
+
+def test_award_does_not_duplicate_the_certificate(oop_engine):
+    oop_engine._award_provisioning_certificate()
+    oop_engine._award_provisioning_certificate()
+
+    assert oop_engine.player["inventory"].count("server_provisioning_certificate") == 1
+
+
+def test_completing_the_challenge_awards_the_certificate(oop_engine, monkeypatch):
+    oop_engine.player["current_room"] = "lab_d2_001"
+    monkeypatch.setattr("src.rooms.lab_d2_001.loader", lambda **kwargs: None)
+    monkeypatch.setattr("builtins.input", lambda prompt="": "exit")
+    monkeypatch.setattr(
+        type(oop_engine.server), "complete", property(lambda self: True)
+    )
+
+    oop_engine.inspect_server()
+
+    assert oop_engine.flags["lab_server_provisioned"] is True
+    assert "server_provisioning_certificate" in oop_engine.player["inventory"]
+
+
+def test_activate_refuses_until_the_server_is_provisioned(oop_engine, monkeypatch):
+    oop_engine.player["current_room"] = "lab_d2_002"
+    oop_engine.workbench["installed_parts"] = list(oop_engine.workbench["required_parts"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": "Tr0janH0rse!")
+
+    oop_engine.activate()
+
+    assert oop_engine.session["phase"] == "EXPLORATION"
+    assert any("provisioned" in line for line in oop_engine.outputs)

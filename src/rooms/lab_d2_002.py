@@ -55,6 +55,18 @@ class LabD2002(Room):
                 )
             )
             return None
+        if not self.flags.get("lab_server_provisioned"):
+            self.render_workbench(
+                self.colorize(
+                    text=(
+                        "The robot's neural link needs the maze-server backend "
+                        "provisioned first. Finish the server configuration in "
+                        "Lab D 2001."
+                    ),
+                    color_code=self.color.ERROR,
+                )
+            )
+            return None
         self.render_workbench(text="Enter wifi password to continue.")
         password = self.prompt()
         self.clear()
