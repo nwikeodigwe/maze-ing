@@ -708,3 +708,44 @@ def test_ssh_on_the_wrong_port_is_refused(shell):
 
     assert "Connection refused" in result.output
     assert shell.state.session["connected_via_ssh"] is False
+
+# -- help command ---------------------------------------------------------
+def test_help_states_the_mission_and_lists_commands(shell):
+    output = shell.execute("help").output
+
+    assert "maze-server" in output
+    assert "neural link" in output
+    assert "checklist" in output
+    assert "ssh" in output
+    assert "ufw" in output
+    # The overview points the player at per-command topics.
+    assert "help <" in output
+
+
+def test_help_shows_the_next_expected_action(shell):
+    # On the workstation the first incomplete step is connecting over ssh.
+    output = shell.execute("help").output
+    assert "ssh -i ~/.ssh/id_ed25519 root@10.11.7.42" in output
+
+    _connected_shell(shell)
+    output = shell.execute("help").output
+    assert "apt update && apt upgrade" in output
+
+
+def test_help_topic_shows_per_command_usage(shell):
+    ssh = shell.execute("help ssh").output
+    assert "ssh -i" in ssh
+    assert "10.11.7.42" in ssh
+
+    ufw = shell.execute("help ufw").output
+    assert "ufw allow" in ufw
+
+
+def test_help_alias_resolves_to_the_same_topic(shell):
+    assert shell.execute("help apt-get").output == shell.execute("help apt").output
+    assert shell.execute("help vim").output == shell.execute("help nano").output
+
+
+def test_help_unknown_topic_is_rejected(shell):
+    output = shell.execute("help frobnicate").output
+    assert "No help" in output

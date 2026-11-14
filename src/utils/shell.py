@@ -490,16 +490,101 @@ class VirtualShell:
         return node
 
 
-SERVER_HELP_TEXT = """Available commands:
-  ls [-a] [-l] [path...]   list directory contents
-  cd [path]                change directory
-  pwd                      print the working directory
-  cat <file...>            print file contents
-  whoami                   print the current user
-  groups                   print the current user's groups
-  sudo <command>           run a command with root privileges
-  exit                     leave the server or the terminal
-  help                     show this help"""
+SERVER_MISSION = (
+    "Provision the maze-server (10.11.7.42) so the robot's neural link can "
+    "come up.\n"
+    "Type `checklist` to see all 11 steps and how far you have got."
+)
+
+#: Command groups shown by ``help`` with no arguments.
+SERVER_HELP_GROUPS = [
+    ("files", ["ls", "cd", "pwd", "cat"]),
+    ("access", ["ssh", "su", "sudo", "whoami", "groups"]),
+    ("packages", ["apt", "adduser", "usermod", "rsync"]),
+    ("editing", ["nano", "vim", "sed"]),
+    ("services", ["systemctl", "sshd", "nginx"]),
+    ("firewall", ["ufw"]),
+    ("network", ["hostnamectl", "netplan", "timedatectl"]),
+    ("web", ["mkdir", "chown", "chmod", "cp", "ln", "ss", "curl", "tail", "journalctl"]),
+    ("meta", ["checklist", "help", "clear", "exit"]),
+]
+
+#: Per-command usage, shown by ``help <name>``.
+SERVER_HELP_TOPICS = {
+    "ls": "ls [-a] [-l] [path...]\nList a directory. -a shows hidden files, -l shows owner and permissions.",
+    "cd": "cd [path]\nChange directory. `cd` or `cd ~` returns to your home directory.",
+    "pwd": "pwd\nPrint the working directory.",
+    "cat": "cat <file...> [> target]\nPrint a file's contents.",
+    "whoami": "whoami\nPrint the current user.",
+    "groups": "groups\nPrint the current user's groups.",
+    "sudo": "sudo <command>\nRun a command as root. Requires sudo rights (see `usermod`).",
+    "ssh": (
+        "ssh [-i key] [-p port] <user>@<host>\n"
+        "Connect to the server, e.g.\n"
+        "  ssh -i ~/.ssh/id_ed25519 root@10.11.7.42"
+    ),
+    "su": "su - <user>\nSwitch to another account (root or sudo required).",
+    "apt": (
+        "apt update && apt upgrade -y\n"
+        "apt install <package>\n"
+        "Refresh the package index, then apply upgrades. Only `nginx` can be "
+        "installed here."
+    ),
+    "adduser": (
+        "adduser <user>\n"
+        "Create an account; it asks for a password, a repeat, then a "
+        "confirmation."
+    ),
+    "usermod": "usermod -aG sudo <user>\nGive an account sudo rights. Keep the -a or memberships are overwritten.",
+    "rsync": (
+        "rsync --archive --chown=<user>:<user> ~/.ssh /home/<user>\n"
+        "Copy your SSH keys to a new account so it can log in over SSH."
+    ),
+    "nano": "nano <file>\nEdit a file. Ctrl+S saves, Ctrl+X (or Esc) exits without saving.",
+    "vim": "vim <file>\nSame editor as `nano`. Ctrl+S saves, Ctrl+X (or Esc) exits.",
+    "sed": "sed -i 's/old/new/' <file>\nEdit a single substitution in place.",
+    "sshd": "sshd -t\nValidate /etc/ssh/sshd_config before reloading the service.",
+    "systemctl": (
+        "systemctl enable|start|reload|status <unit>\n"
+        "Manage sshd and nginx. `--now` starts right after enabling, e.g.\n"
+        "  systemctl enable --now nginx"
+    ),
+    "nginx": "nginx -t\nValidate the nginx configuration before starting the service.",
+    "ufw": (
+        "ufw default allow|deny incoming|outgoing\n"
+        "ufw allow <port>/tcp\n"
+        "ufw enable\n"
+        "Configure the firewall. Allow the SSH port *before* `ufw enable`, or "
+        "your session is cut."
+    ),
+    "hostnamectl": "hostnamectl set-hostname <hostname>\nSet the server's fully-qualified hostname.",
+    "netplan": "netplan apply\nApply the static IP configuration in /etc/netplan/50-cloud-init.yaml.",
+    "timedatectl": (
+        "timedatectl set-timezone UTC\n"
+        "timedatectl set-ntp true\n"
+        "Set the timezone and enable network time synchronisation."
+    ),
+    "mkdir": "mkdir -p <path>\nCreate a directory (parents included).",
+    "chown": "chown -R <user>:<group> <path>\nChange the owner of a path and everything below it.",
+    "chmod": "chmod -R <mode> <path>\nChange permissions of a path and everything below it.",
+    "cp": "cp <source> <destination>\nCopy a file; if the destination is a directory, the file is copied inside it.",
+    "ln": "ln -s <target> <link>\nCreate a symbolic link (used to enable an nginx site).",
+    "ss": "ss -tulpn\nList the listening sockets and their ports.",
+    "curl": "curl -I <url>\nFetch a URL, e.g. `curl -I http://localhost`.",
+    "tail": "tail -n 20 <file>\nShow the end of a log file (e.g. /var/log/nginx/access.log).",
+    "journalctl": "journalctl -u <unit>\nShow a service's journal entries.",
+    "checklist": "checklist\nShow the 11 provisioning steps and which are complete.",
+    "help": "help [<name>]\nShow an overview, or the usage of one command.",
+    "clear": "clear\nClear the screen.",
+    "exit": "exit\nLeave the server (or the terminal when already on the workstation).",
+}
+
+#: Alternate topic names that point at the same usage text.
+SERVER_HELP_ALIASES = {
+    "vim": "nano",
+    "apt-get": "apt",
+    "netstat": "ss",
+}
 
 
 class ServerShell:
@@ -828,8 +913,36 @@ class ServerShell:
         return ShellResult(output=user)
 
     def _cmd_help(self, args: list[str]) -> ShellResult:
-        """Show the supported commands."""
-        return ShellResult(output=SERVER_HELP_TEXT)
+        """Show the mission and command list, or the usage of one command."""
+        if args:
+            topic = SERVER_HELP_ALIASES.get(args[0], args[0])
+            text = SERVER_HELP_TOPICS.get(topic)
+            if text is None:
+                return ShellResult(
+                    output=(
+                        f"No help for '{args[0]}'. Type `help` for the command list."
+                    )
+                )
+            return ShellResult(output=text)
+
+        session = self.state.session
+        lines = [SERVER_MISSION, ""]
+        for step in self.state.steps():
+            if not step.done:
+                lines.append(
+                    f"You are on {session['machine']} as {session['user']}."
+                )
+                lines.append(f"Next: {step.title}")
+                if step.hint:
+                    lines.append(f"      {step.hint}")
+                break
+        lines.append("")
+        lines.append("Commands (type `help <name>` for usage):")
+        for group, commands in SERVER_HELP_GROUPS:
+            lines.append(f"  {group:<9} {', '.join(commands)}")
+        lines.append("")
+        lines.append("Type `checklist` at any time to review the 11 provisioning steps.")
+        return ShellResult(output="\n".join(lines))
 
     def _cmd_clear(self, args: list[str]) -> ShellResult:
         """Request a screen clear."""

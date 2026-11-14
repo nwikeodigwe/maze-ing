@@ -632,6 +632,20 @@ def test_inspect_guide_quits_on_q(oop_state, tmp_path, monkeypatch, capsys):
     assert "line 1" in out
     assert "line 5" not in out
 
+
+def test_lab_d2_001_guide_is_non_empty_and_complete(oop_state):
+    guide = (
+        oop_state.DATA_DIR / "guides" / "lab_d2_001.txt"
+    ).read_text(encoding="utf-8")
+
+    assert guide.strip(), "lab_d2_001 guide file is empty"
+    assert "inspect server" in guide
+    assert "PermitRootLogin no" in guide
+    assert "ufw allow 22/tcp" in guide
+    assert "checklist" in guide
+    assert "10.11.7.42" in guide
+    assert "nginx" in guide
+
 def test_inspect_server_runs_the_terminal_session(oop_engine, monkeypatch):
     oop_engine.player["current_room"] = "lab_d2_001"
     oop_engine.session["duration"]["value"] = "0:05:00"

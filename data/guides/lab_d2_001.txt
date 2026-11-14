@@ -1,0 +1,93 @@
+You are in Lab D 2001, the server room where the maze-server lives.
+
+The maze-server is the backend that powers the robot's neural link.
+Until it is provisioned, the robot cannot be activated at the workbench,
+no matter how many parts you have assembled.
+
+TAKE THE FIRST STEP
+Open the server terminal, then work through all 11 steps below:
+
+  inspect server
+
+Inside the terminal, type `checklist` to see the 11 steps with your
+progress, and `help` for a summary of what to do next.
+
+STEP 1 - CONNECT TO THE SERVER
+  ssh -i ~/.ssh/id_ed25519 root@10.11.7.42
+Answer `yes` when asked about the host fingerprint.
+
+STEP 2 - UPDATE THE SYSTEM
+  apt update
+  apt upgrade -y
+
+STEP 3 - CREATE AN ADMIN ACCOUNT
+  adduser maze-admin
+  usermod -aG sudo maze-admin
+  rsync --archive --chown=maze-admin:maze-admin ~/.ssh /home/maze-admin
+
+STEP 4 - HARDEN SSH
+  nano /etc/ssh/sshd_config
+Set these two lines:
+  PermitRootLogin no
+  PasswordAuthentication no
+Then reload the service:
+  sshd -t
+  systemctl reload sshd
+
+STEP 5 - CONFIGURE THE FIREWALL
+  ufw default deny incoming
+  ufw default allow outgoing
+  ufw allow 22/tcp
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw enable
+
+STEP 6 - HOSTNAME AND STATIC IP
+  hostnamectl set-hostname maze-server.thuas.nl
+  nano /etc/hosts
+Add a line mapping `maze-server.thuas.nl` to 10.11.7.42.
+  nano /etc/netplan/50-cloud-init.yaml
+Set the static address `10.11.7.42/24`, then:
+  netplan apply
+
+STEP 7 - SYNCHRONISE THE CLOCK
+  timedatectl set-timezone UTC
+  timedatectl set-ntp true
+
+STEP 8 - INSTALL AND CONFIGURE NGINX
+  apt install nginx
+  nano /etc/nginx/sites-available/app
+Write a server block for the maze site:
+  server {
+    listen 80;
+    root /var/www/maze;
+  }
+Then enable and validate it:
+  ln -s /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app
+  nginx -t
+
+STEP 9 - WEB ROOT PERMISSIONS
+  mkdir -p /var/www/maze
+  chown -R maze-admin:www-data /var/www/maze
+  chmod -R 755 /var/www/maze
+
+STEP 10 - START THE DAEMON
+  systemctl enable --now nginx
+
+STEP 11 - VERIFY EVERYTHING
+  systemctl status nginx
+  ss -tulpn
+  curl -I http://localhost
+
+WARNINGS
+1. Allow the SSH port BEFORE enabling the firewall. Running
+   `ufw enable` without `ufw allow 22/tcp` severs your session and
+   rolls the firewall back to the workstation.
+2. After Steps 3 and 4, root login is disabled. Reconnect with your
+   admin account instead of root:
+     ssh -i ~/.ssh/id_ed25519 maze-admin@10.11.7.42
+
+WHEN YOU ARE DONE
+The lab awards the Server Provisioning Certificate and puts the robot
+on standby. Your progress is saved, so you can leave and return to the
+terminal without losing any work.
