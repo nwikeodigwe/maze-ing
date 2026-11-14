@@ -9,6 +9,15 @@ class LabD2001(Room):
     def __init__(self):
         super().__init__()
 
+    def _award_provisioning_certificate(self) -> None:
+        """Mark the challenge complete and grant the certificate once."""
+        self.flags["lab_server_provisioned"] = True
+        if "server_provisioning_certificate" in self.player["inventory"]:
+            return
+        self.player["inventory"].append("server_provisioning_certificate")
+        name = self.items["server_provisioning_certificate"]["name"]
+        self.out(self.colorize(text=f"{name} added to your inventory!", color_code=self.color.SUCCESS))
+
     def inspect_server(self) -> None:
         """Open the lab workstation terminal and run the provisioning challenge.
 
@@ -52,4 +61,15 @@ class LabD2001(Room):
             self.session["duration"]["pause"] = False
             self.clear()
             self.render()
+        if self.state.server.complete:
+            self._award_provisioning_certificate()
+            self.out(
+                self.colorize(
+                    text=(
+                        "Server Provisioning Complete - the robot's neural link "
+                        "can come up."
+                    ),
+                    color_code=self.color.SUCCESS,
+                )
+            )
         return None
