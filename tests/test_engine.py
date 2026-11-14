@@ -2,7 +2,7 @@
 
 import pytest
 
-import src.rooms.lab as lab_oop
+import src.rooms.lab_d2_002 as lab_oop
 import src.rooms.teachers_room_4 as tr4_oop
 import src.room as room_oop
 
@@ -16,19 +16,32 @@ def test_inventory_empty_and_populated(oop_engine):
     assert any("empty" in line for line in oop_engine.outputs)
 
     oop_engine.outputs.clear()
-    oop_engine.player["inventory"] = ["blueprint", "battery_pack"]
+    oop_engine.player["inventory"] = ["development_board", "obstacle_avoidance_module"]
     oop_engine.inventory()
 
     text = "\n".join(oop_engine.outputs)
-    assert "Robot Assembly Blueprint" in text
-    assert "High-Capacity Battery Pack" in text
-    assert "1/8" in text
+    assert "ESP32 Development Board" in text
+    assert "Obstacle Avoidance Module" in text
+    assert "1/11" in text
+
+
+def test_inventory_groups_duplicate_items(oop_engine):
+    oop_engine.player["inventory"] = [
+        "red_led", "red_led",
+        "obstacle_avoidance_module", "obstacle_avoidance_module",
+    ]
+    oop_engine.inventory()
+
+    text = "\n".join(oop_engine.outputs)
+    assert "Red Light Emitting Diode x2" in text
+    assert "Obstacle Avoidance Module x2" in text
+    assert "2/11" in text
 
 
 def test_status_screen_renders(oop_engine):
     oop_engine.flags["tr1_desk_unlocked"] = True
     oop_engine.player["move"] = ["teachers_room_1"]
-    oop_engine.player["inventory"] = ["blueprint"]
+    oop_engine.player["inventory"] = ["development_board"]
 
     oop_engine.status()
 
@@ -37,6 +50,16 @@ def test_status_screen_renders(oop_engine):
     assert "Tester" in text
     assert "EXPLORATION" in text
     assert "desk unlocked" in text.lower()
+
+
+def test_status_inventory_groups_duplicates(oop_engine):
+    oop_engine.player["inventory"] = ["red_led", "red_led", "oled_display"]
+
+    oop_engine.status()
+
+    text = "\n".join(oop_engine.outputs)
+    assert "Red Light Emitting Diode x2" in text
+    assert "O.96 Inch OLED Display" in text
 
 
 def test_helper_renders_rich_menu(oop_engine, capsys):
@@ -59,7 +82,7 @@ def test_inspect_dispatches_room_specific_targets(oop_engine, monkeypatch):
     oop_engine.inspect({"target": "desk"})
     assert any("Keypad hint" in line for line in oop_engine.outputs)
 
-    oop_engine.player["current_room"] = "lab_d2_001"
+    oop_engine.player["current_room"] = "lab_d2_002"
     oop_engine.inspect({"target": "workbench"})
     assert any("WORKBENCH" in line for line in oop_engine.outputs)
 
@@ -98,26 +121,26 @@ def test_use_desk_code_paths(oop_engine):
 
 
 def test_use_on_workbench_paths(oop_engine):
-    oop_engine.player["current_room"] = "lab_d2_001"
-    oop_engine.player["inventory"] = ["chassis_frame", "blueprint"]
+    oop_engine.player["current_room"] = "lab_d2_002"
+    oop_engine.player["inventory"] = ["obstacle_avoidance_module", "development_board"]
 
     oop_engine.use({"target": "missing", "indirect": "workbench"})
     assert any("not a workbench component" in line for line in oop_engine.outputs)
 
-    oop_engine.use({"target": "mainboard", "indirect": "workbench"})
+    oop_engine.use({"target": "f_m_dupont_cable", "indirect": "workbench"})
     assert any("do not have" in line for line in oop_engine.outputs)
 
-    oop_engine.use({"target": "blueprint", "indirect": "workbench"})
+    oop_engine.use({"target": "development_board", "indirect": "workbench"})
     assert any("not a workbench component" in line for line in oop_engine.outputs)
 
-    oop_engine.workbench["installed_parts"] = ["chassis_frame"]
-    oop_engine.use({"target": "chassis_frame", "indirect": "workbench"})
+    oop_engine.workbench["installed_parts"] = ["obstacle_avoidance_module"]
+    oop_engine.use({"target": "obstacle_avoidance_module", "indirect": "workbench"})
     assert any("already installed" in line for line in oop_engine.outputs)
 
     oop_engine.workbench["installed_parts"] = []
-    oop_engine.use({"target": "chassis_frame", "indirect": "workbench"})
-    assert "chassis_frame" in oop_engine.workbench["installed_parts"]
-    assert "chassis_frame" not in oop_engine.player["inventory"]
+    oop_engine.use({"target": "obstacle_avoidance_module", "indirect": "workbench"})
+    assert "obstacle_avoidance_module" in oop_engine.workbench["installed_parts"]
+    assert "obstacle_avoidance_module" not in oop_engine.player["inventory"]
 
     required = oop_engine.workbench["required_parts"]
     oop_engine.workbench["installed_parts"] = required[:-1]
@@ -128,24 +151,32 @@ def test_use_on_workbench_paths(oop_engine):
 
 
 def test_use_elsewhere_reports_missing_or_useless(oop_engine):
-    oop_engine.use({"target": "blueprint", "indirect": "wall"})
+    oop_engine.use({"target": "development_board", "indirect": "wall"})
     assert any("do not have" in line for line in oop_engine.outputs)
 
+    oop_engine.player["inventory"] = ["development_board"]
+    oop_engine.use({"target": "development_board", "indirect": "wall"})
+    assert any("cannot use" in line for line in oop_engine.outputs)
+
+
+def test_use_elsewhere_reports_unknown_item(oop_engine):
     oop_engine.player["inventory"] = ["blueprint"]
+
     oop_engine.use({"target": "blueprint", "indirect": "wall"})
+
     assert any("cannot use" in line for line in oop_engine.outputs)
 
 
 def test_take_and_drop(oop_engine):
-    oop_engine.take({"target": "blueprint"})
-    assert "blueprint" in oop_engine.player["inventory"]
-    assert "blueprint" not in oop_engine.rooms["lobby"]["items"]
+    oop_engine.take({"target": "development_board"})
+    assert "development_board" in oop_engine.player["inventory"]
+    assert "development_board" not in oop_engine.rooms["lobby"]["items"]
 
     oop_engine.take({"target": "not_here"})
     assert any("no 'not_here' here" in line for line in oop_engine.outputs)
 
-    oop_engine.drop({"target": "blueprint"})
-    assert "blueprint" in oop_engine.rooms["lobby"]["items"]
+    oop_engine.drop({"target": "development_board"})
+    assert "development_board" in oop_engine.rooms["lobby"]["items"]
 
     oop_engine.drop({"target": "not_an_item"})
     assert any("no item called" in line for line in oop_engine.outputs)
@@ -379,7 +410,7 @@ def test_chat_phase_intro_known_and_ai_input(oop_engine, monkeypatch):
     oop_engine.chat()
     assert commands == ["status"]
 
-    oop_engine.player["current_room"] = "lab_d2_001"
+    oop_engine.player["current_room"] = "lab_d2_002"
     monkeypatch.setattr(oop_engine, "prompt", lambda *args: "hello robot")
     oop_engine.chat()
     assert oop_engine.langchain.calls == ["hello robot"]
@@ -539,3 +570,62 @@ def test_room_base_missing_attribute_raises(oop_state):
 
     with pytest.raises(AttributeError):
         _ = room.does_not_exist
+
+
+def test_footer_groups_duplicate_items(oop_state, capsys):
+    room = room_oop.Room(state=oop_state)
+    oop_state.player["current_room"] = "lobby"
+    oop_state.rooms["lobby"]["items"] = ["red_led", "red_led", "oled_display"]
+
+    room.render()
+    out = capsys.readouterr().out
+
+    assert "Red Light Emitting Diode x2" in out
+    assert out.count("Red Light Emitting Diode") == 1
+    assert "O.96 Inch OLED Display" in out
+
+
+def test_inspect_guide_pages_through_the_file(oop_state, tmp_path, monkeypatch, capsys):
+    guides = tmp_path / "guides"
+    guides.mkdir()
+    (guides / "lobby.txt").write_text(
+        "\n".join(f"line {i}" for i in range(1, 10)), encoding="utf-8"
+    )
+    monkeypatch.setattr(oop_state, "DATA_DIR", tmp_path)
+
+    room = room_oop.Room(state=oop_state)
+    oop_state.player["current_room"] = "lobby"
+    keys = []
+
+    def fake_key():
+        keys.append("")
+        return ""
+
+    monkeypatch.setattr(room, "_read_page_key", fake_key)
+    room.inspect_guide()
+
+    out = capsys.readouterr().out
+    assert "line 1" in out
+    assert "line 9" in out
+    assert len(keys) == 2
+    # The ":" prompt is erased instead of being left in the terminal.
+    assert "\r" in out
+
+
+def test_inspect_guide_quits_on_q(oop_state, tmp_path, monkeypatch, capsys):
+    guides = tmp_path / "guides"
+    guides.mkdir()
+    (guides / "lobby.txt").write_text(
+        "\n".join(f"line {i}" for i in range(1, 10)), encoding="utf-8"
+    )
+    monkeypatch.setattr(oop_state, "DATA_DIR", tmp_path)
+
+    room = room_oop.Room(state=oop_state)
+    oop_state.player["current_room"] = "lobby"
+    monkeypatch.setattr(room, "_read_page_key", lambda: "q")
+
+    room.inspect_guide()
+
+    out = capsys.readouterr().out
+    assert "line 1" in out
+    assert "line 5" not in out
