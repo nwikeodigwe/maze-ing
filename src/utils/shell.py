@@ -10,7 +10,16 @@ the real filesystem, the network, or the host operating system, and
 import fnmatch
 import posixpath
 import shlex
+from collections.abc import Callable
 from dataclasses import dataclass
+
+from src.server_state import (
+    LOCAL_MACHINE,
+    LOCAL_USER,
+    SERVER_HOSTNAME,
+    SERVER_IP,
+    ServerState,
+)
 
 HELP_TEXT = """Available commands:
   ls [-a] [-l] [path...]   list directory contents
@@ -36,12 +45,15 @@ class ShellResult:
         clear_requested: True when the screen should be cleared.
         read_paths: Absolute virtual paths of files whose contents were
             printed, used by callers to trigger read-based rewards.
+        prompt: Text of a sub-prompt the shell is waiting on. The caller
+            reads a line and passes it back to the shell.
     """
 
     output: str = ""
     exit_requested: bool = False
     clear_requested: bool = False
     read_paths: tuple[str, ...] = ()
+    prompt: str | None = None
 
 
 class VirtualShell:
@@ -476,3 +488,355 @@ class VirtualShell:
                 return None
             node = node[part]
         return node
+
+
+SERVER_HELP_TEXT = """Available commands:
+  ls [-a] [-l] [path...]   list directory contents
+  cd [path]                change directory
+  pwd                      print the working directory
+  cat <file...>            print file contents
+  whoami                   print the current user
+  groups                   print the current user's groups
+  sudo <command>           run a command with root privileges
+  exit                     leave the server or the terminal
+  help                     show this help"""
+
+
+class ServerShell:
+    """Shell for the Lab D 2001 server-provisioning challenge.
+
+    The shell plays two machines from one state: the local workstation the
+    player starts at, and the server reached over SSH. Commands mutate the
+    server state in place, so progress is judged by evaluating state rather
+    than by matching command strings.
+
+    Attributes:
+        state: The :class:`~src.server_state.ServerState` being played.
+    """
+
+    #: Commands that need root privileges.
+    _PRIVILEGED = (
+        "apt",
+        "adduser",
+        "usermod",
+        "rsync",
+        "chown",
+        "chmod",
+        "cp",
+        "mkdir",
+        "ln",
+        "systemctl",
+        "sshd",
+        "nginx",
+        "ufw",
+        "hostnamectl",
+        "netplan",
+        "timedatectl",
+    )
+
+    def __init__(
+        self,
+        state: ServerState,
+        read_line: Callable[[str], str] | None = None,
+        write: Callable[[str], None] | None = None,
+        editor: Callable[[str], tuple[bool, str]] | None = None,
+    ) -> None:
+        """Bind a shell to the server state.
+
+        Args:
+            state: The challenge state to play.
+            read_line: Callable reading one line of input. Defaults to ``input``.
+            write: Callable receiving output. Defaults to ``print``.
+            editor: Callable opening a file for editing; it receives the file
+                text and returns ``(saved, text)``. Defaults to a
+                :class:`~src.utils.editor.ModalEditor` session.
+        """
+        self.state = state
+        self._read_line = read_line if read_line is not None else input
+        self._write = write if write is not None else print
+        self._editor = editor if editor is not None else self._default_editor
+
+    def _default_editor(self, text: str) -> tuple[bool, str]:
+        """Open the modal editor on the current terminal."""
+        from src.utils.editor import ModalEditor
+
+        return ModalEditor(text, write=self._write).run()
+
+    # -- prompt ------------------------------------------------------------
+
+    @property
+    def home(self) -> str:
+        """Home directory of the current user."""
+        user = self.state.session["user"]
+        return "/root" if user == "root" else f"/home/{user}"
+
+    @property
+    def prompt(self) -> str:
+        """The rendered prompt for the current machine."""
+        session = self.state.session
+        cwd = session["cwd"]
+        home = self.home
+        if cwd == home:
+            display = "~"
+        elif cwd.startswith(home + "/"):
+            display = "~" + cwd[len(home) :]
+        else:
+            display = cwd
+        return (
+            f"{session['user']}@{session['machine']}:"
+            f"{display}{session['prompt_symbol']}"
+        )
+
+    # -- execution ---------------------------------------------------------
+
+    def execute(self, command: str) -> ShellResult:
+        """Run one command line.
+
+        Args:
+            command: Raw input line.
+
+        Returns:
+            The command outcome. Malformed input yields an error result
+            instead of raising.
+        """
+        if self.state.session.get("pending_prompt"):
+            return self.answer(command)
+        try:
+            tokens = shlex.split(command, posix=True)
+        except ValueError:
+            return ShellResult(output="bash: syntax error: unmatched quote")
+        if not tokens:
+            return ShellResult()
+        name, args = tokens[0], tokens[1:]
+        if name == "sudo":
+            return self._run_sudo(args)
+        if name in self._PRIVILEGED and self.state.session["user"] != "root":
+            return ShellResult(output="Permission denied (are you root?)")
+        handler = getattr(self, f"_cmd_{name}", None)
+        if handler is None:
+            return ShellResult(output=f"bash: {name}: command not found")
+        return handler(args)
+
+    def _run_sudo(self, args: list[str]) -> ShellResult:
+        """Run a command with elevated rights."""
+        user = self.state.session["user"]
+        allowed = self.state.system.get("users", {}).get(user, {}).get("sudo")
+        if user != "root" and not allowed:
+            return ShellResult(
+                output=(
+                    f"sudo: {user} is not in the sudoers file. "
+                    "This incident will be reported."
+                )
+            )
+        if not args:
+            return ShellResult(output="sudo: no command given")
+        name, rest = args[0], args[1:]
+        handler = getattr(self, f"_cmd_{name}", None)
+        if handler is None:
+            return ShellResult(output=f"bash: {name}: command not found")
+        session = self.state.session
+        previous = session["user"]
+        session["user"] = "root"
+        try:
+            return handler(rest)
+        finally:
+            session["user"] = previous
+
+    def answer(self, text: str) -> ShellResult:
+        """Resolve the pending sub-prompt with the player's answer.
+
+        Args:
+            text: What the player typed.
+
+        Returns:
+            The outcome of the interrupted command.
+        """
+        pending = self.state.session.get("pending_prompt")
+        if not pending:
+            return ShellResult()
+        self.state.session["pending_prompt"] = None
+        handler = getattr(self, f"_answer_{pending.get('kind')}", None)
+        if handler is None:
+            return ShellResult()
+        return handler(text, pending)
+
+    def _answer_ssh_host_key(self, text: str, pending: dict) -> ShellResult:
+        """Resolve the SSH host-key confirmation prompt."""
+        host = pending.get("host", SERVER_IP)
+        answer = text.strip().lower()
+        if answer == "yes":
+            known_hosts = self.state.system.setdefault("known_hosts", [])
+            if host not in known_hosts:
+                known_hosts.append(host)
+            session = self.state.session
+            session["connected_via_ssh"] = True
+            session["machine"] = SERVER_HOSTNAME
+            session["user"] = "root"
+            session["cwd"] = "/root"
+            session["prompt_symbol"] = "#"
+            return ShellResult()
+        if answer == "no":
+            return ShellResult(output=f"Connection to {host} closed.")
+        return ShellResult(prompt="Please type 'yes', 'no' or the fingerprint: ")
+
+    # -- filesystem helpers -------------------------------------------------
+
+    def _resolve(self, path: str) -> str:
+        """Resolve a path to an absolute, normalized virtual path."""
+        if path == "~" or path.startswith("~/"):
+            path = self.home + path[1:]
+        elif not path.startswith("/"):
+            path = posixpath.join(self.state.session["cwd"], path)
+        return "/" + posixpath.normpath(path).lstrip("/")
+
+    def _node(self, path: str) -> dict | None:
+        """Return the filesystem node at an absolute path."""
+        return self.state.filesystem.get(path)
+
+    def _children(self, path: str) -> list[str]:
+        """Names of the entries directly inside a directory."""
+        prefix = path if path.endswith("/") else path + "/"
+        names = []
+        for candidate in self.state.filesystem:
+            if candidate.startswith(prefix):
+                rest = candidate[len(prefix) :]
+                if rest and "/" not in rest:
+                    names.append(rest)
+        return sorted(names)
+
+    def _is_dir(self, path: str) -> bool:
+        """True when a path is a directory."""
+        node = self._node(path)
+        if node is not None and node.get("type") == "dir":
+            return True
+        return bool(self._children(path))
+
+    # -- commands -----------------------------------------------------------
+
+    def _cmd_pwd(self, args: list[str]) -> ShellResult:
+        """Print the working directory."""
+        return ShellResult(output=self.state.session["cwd"])
+
+    def _cmd_cd(self, args: list[str]) -> ShellResult:
+        """Change the working directory."""
+        if len(args) > 1:
+            return ShellResult(output="cd: too many arguments")
+        raw = args[0] if args else "~"
+        path = self._resolve(raw)
+        if self._node(path) is None and not self._is_dir(path):
+            return ShellResult(output=f"cd: no such file or directory: {raw}")
+        if not self._is_dir(path):
+            return ShellResult(output=f"cd: not a directory: {raw}")
+        self.state.session["cwd"] = path
+        return ShellResult()
+
+    def _cmd_ls(self, args: list[str]) -> ShellResult:
+        """List directory contents."""
+        show_all = False
+        long_format = False
+        targets: list[str] = []
+        for arg in args:
+            if arg == "--all":
+                show_all = True
+            elif arg.startswith("--"):
+                return ShellResult(output=f"ls: unrecognized option '{arg}'")
+            elif arg.startswith("-") and arg != "-":
+                for flag in arg[1:]:
+                    if flag == "a":
+                        show_all = True
+                    elif flag == "l":
+                        long_format = True
+                    else:
+                        return ShellResult(output=f"ls: invalid option -- '{flag}'")
+            else:
+                targets.append(arg)
+        if not targets:
+            targets = ["."]
+
+        errors: list[str] = []
+        blocks: list[str] = []
+        for target in targets:
+            path = self._resolve(target)
+            if self._node(path) is None and not self._is_dir(path):
+                errors.append(
+                    f"ls: cannot access '{target}': No such file or directory"
+                )
+                continue
+            if not self._is_dir(path):
+                blocks.append(path)
+                continue
+            names = self._children(path)
+            if not show_all:
+                names = [name for name in names if not name.startswith(".")]
+            if long_format:
+                lines = [self._long_entry(path, name) for name in names]
+            else:
+                lines = names
+            body = "\n".join(lines)
+            blocks.append(f"{target}:\n{body}" if len(targets) > 1 else body)
+        return ShellResult(output="\n\n".join([*errors, *blocks]))
+
+    def _long_entry(self, directory: str, name: str) -> str:
+        """Render one ``ls -l`` line."""
+        path = posixpath.join(directory, name)
+        node = self._node(path)
+        if node is None or node.get("type") == "dir":
+            mode = "drwxr-xr-x"
+            size = 4096
+            owner = node.get("owner", "root:root") if node else "root:root"
+        else:
+            mode = "-rw-r--r--"
+            size = len(node.get("content", ""))
+            owner = node.get("owner", "root:root")
+        return f"{mode} 1 {owner} {size:>6} Jan 01 00:00 {name}"
+
+    def _cmd_cat(self, args: list[str]) -> ShellResult:
+        """Print file contents."""
+        if not args:
+            return ShellResult(output="cat: missing operand")
+        lines: list[str] = []
+        read_paths: list[str] = []
+        for raw in args:
+            path = self._resolve(raw)
+            node = self._node(path)
+            if node is None:
+                lines.append(f"cat: {raw}: No such file or directory")
+            elif node.get("type") == "dir":
+                lines.append(f"cat: {raw}: Is a directory")
+            else:
+                lines.append(node.get("content", ""))
+                read_paths.append(path)
+        return ShellResult(output="\n".join(lines), read_paths=tuple(read_paths))
+
+    def _cmd_whoami(self, args: list[str]) -> ShellResult:
+        """Print the current user."""
+        return ShellResult(output=self.state.session["user"])
+
+    def _cmd_groups(self, args: list[str]) -> ShellResult:
+        """Print the groups of the current user."""
+        user = self.state.session["user"]
+        if user == "root":
+            return ShellResult(output="root sudo")
+        if self.state.system.get("users", {}).get(user, {}).get("sudo"):
+            return ShellResult(output=f"{user} sudo")
+        return ShellResult(output=user)
+
+    def _cmd_help(self, args: list[str]) -> ShellResult:
+        """Show the supported commands."""
+        return ShellResult(output=SERVER_HELP_TEXT)
+
+    def _cmd_clear(self, args: list[str]) -> ShellResult:
+        """Request a screen clear."""
+        return ShellResult(clear_requested=True)
+
+    def _cmd_exit(self, args: list[str]) -> ShellResult:
+        """Leave the server, or the terminal when already on the workstation."""
+        session = self.state.session
+        if session["machine"] == LOCAL_MACHINE:
+            return ShellResult(exit_requested=True)
+        session["machine"] = LOCAL_MACHINE
+        session["user"] = LOCAL_USER
+        session["cwd"] = f"/home/{LOCAL_USER}"
+        session["prompt_symbol"] = "$"
+        session["connected_via_ssh"] = False
+        return ShellResult(output="Connection to maze-server closed.")
