@@ -391,3 +391,30 @@ def test_verification_commands_set_the_health_flags(shell):
 
     shell.execute("curl -I http://localhost")
     assert shell.state.system["health_verified"]["logs_or_http_checked"] is True
+
+def test_checklist_lists_all_eleven_steps_with_progress(shell):
+    output = shell.execute("checklist").output
+    assert len(output.splitlines()) == 22
+    assert "[x]" not in output
+    assert "[ ]" in output
+    assert "Step 1" in output
+    assert "ssh -i ~/.ssh/id_ed25519 root@10.11.7.42" in output
+
+    _connected_shell(shell)
+    output = shell.execute("checklist").output
+    assert "[x] Step 1" in output
+
+
+def test_checklist_marks_completed_steps(shell):
+    _connected_shell(shell)
+    shell.execute("apt update")
+    shell.execute("apt upgrade -y")
+    output = shell.execute("checklist").output
+    assert "[x]" in output
+
+
+def test_checklist_hints_the_next_incomplete_step(shell):
+    _connected_shell(shell)
+    output = shell.execute("checklist").output
+    assert "Step 5" in output
+    assert "ufw" in output
