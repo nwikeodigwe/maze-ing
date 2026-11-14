@@ -1,5 +1,9 @@
 import builtins
+import os
 import re
+import sys
+
+from collections import Counter
 
 from src.state import State
 from database import Database
@@ -61,8 +65,6 @@ class Room:
 
             Console().clear()
         except ModuleNotFoundError:
-            import os
-
             if os.getenv("PYCHARM_HOSTED"):
                 import builtins
 
@@ -84,7 +86,35 @@ class Room:
         """
         if message is None:
             return input("\n> ").strip()
-        return input(f"\n{message} >").strip()
+        return input(f"\n{message} ").strip()
+
+    def _read_page_key(self) -> str:
+        """Read a single keypress without waiting for Enter.
+
+        Uses ``msvcrt`` on Windows and a temporary raw terminal mode on POSIX. Falls
+        back to line input when a single key cannot be read (piped stdin, CI).
+
+        Returns:
+            The key that was pressed.
+        """
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+
+                return msvcrt.getwch()
+
+            import termios
+            import tty
+
+            fd = sys.stdin.fileno()
+            saved = termios.tcgetattr(fd)
+            try:
+                tty.setraw(fd)
+                return sys.stdin.read(1)
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, saved)
+        except (ImportError, OSError, ValueError):
+            return input("")
 
     def draw_line(self, char: str = "-") -> None:
         """Print a dimmed horizontal rule spanning the terminal width."""
@@ -103,6 +133,8 @@ class Room:
         current_room = self.state.player["current_room"]
         room_data = self.state.rooms[current_room]
 
+        player_name = self.state.player.get("name") or "guest"
+
         self.draw_line("═")
         self.out(self.colorize(f"[{self.state.session['phase']}]", self.color.BRIGHT_MAGENTA))
 
@@ -112,16 +144,16 @@ class Room:
                 1,
                 self.state.terminal_width
                 - visible_len
-                - len(self.state.player["name"]),
+                - len(player_name),
             )
             self.out(content, end=f"{' ' * space_needed}")
-            self.out(self.colorize(f"{self.state.player['name'].upper()}", self.color.DIM))
+            self.out(self.colorize(f"{player_name.upper()}", self.color.DIM))
         else:
             space_needed = max(
                 1,
                 self.state.terminal_width
                 - len(f"LOCATION: {room_data['name']}")
-                - len(self.state.player["name"]),
+                - len(player_name),
             )
             self.out(
                 self.colorize(
@@ -129,7 +161,7 @@ class Room:
                 ),
                 end=f"{' ' * space_needed}",
             )
-            self.out(self.colorize(f"{self.state.player['name'].upper()}", self.color.DIM))
+            self.out(self.colorize(f"{player_name.upper()}", self.color.DIM))
 
         duration = self.state.session["duration"]
         self.out(
@@ -162,9 +194,12 @@ class Room:
         room_items = room_data.get("items") or []
         if room_items:
             self.out(
-                self.colorize(text="\nItems in area:", color_code=self.color.BRIGHT_WHITE + self.color.BOLD)
+                self.colorize(
+                    text=f"\nItems in {room_data['name']}:",
+                    color_code=self.color.BRIGHT_WHITE + self.color.BOLD,
+                )
             )
-            for item_id in room_items:
+            for item_id, count in Counter(room_items).items():
                 item_data = self.state.items[item_id]
                 display_name = item_data.get("name", item_id)
                 component_tag = (
@@ -172,8 +207,10 @@ class Room:
                     if item_data.get("is_assembly_part")
                     else ""
                 )
+                quantity = f" x{count}" if count > 1 else ""
                 self.out(
-                    f"  • {self.colorize(display_name, self.color.BRIGHT_YELLOW)}{component_tag}"
+                    f"  • {self.colorize(display_name, self.color.BRIGHT_YELLOW)}"
+                    f"{quantity}{component_tag}"
                 )
 
         interactables = (
@@ -203,3 +240,50 @@ class Room:
 
         self.out(f"\n{text}\n")
         self.footer()
+
+    def inspect_guide(self) -> None:
+        """Print this room's guide, four lines at a time.
+
+        Uses ``data/guides/<room>.txt`` when it exists, otherwise falls back to the
+        room's ``guide`` interactable text. Press Enter for the next page or ``q`` to
+        stop reading.
+        """
+        current_room = self.state.player["current_room"]
+        guide_txt = self.state.DATA_DIR / "guides" / f"{current_room}.txt"
+        self.header(
+            self.colorize(
+                text=f"{self.state.rooms[current_room]['name']} guide".upper(),
+                color_code=self.color.BRIGHT_CYAN,
+            )
+        )
+        self.out()
+        try:
+            guide = guide_txt.read_text(encoding="utf-8").strip()
+        except OSError:
+            objects = self.state.rooms[current_room].get("interactables", {})
+            guide = objects.get("guide") or "No guide for the current room."
+            self.out(self.colorize(text=guide, color_code=self.color.WHITE))
+            return None
+
+        lines = guide.splitlines()
+        index = 0
+        while index < len(lines):
+            for line in lines[index:index + 4]:
+                self.out(line)
+            index += 4
+            if index >= len(lines):
+                break
+
+            prompt = ":"
+            self.out(prompt, end="")
+            try:
+                key = self._read_page_key()
+            except (EOFError, KeyboardInterrupt):
+                break
+            finally:
+                # Erase the prompt so it does not stay in the terminal.
+                self.out("\r" + " " * 80 + "\r", end="")
+
+            if key.lower() == "q":
+                break
+        return None

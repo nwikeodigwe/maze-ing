@@ -6,6 +6,54 @@ from datetime import timedelta
 
 import src.state as state_oop
 
+from src.server_state import ServerState
+from src.state import State
+
+
+def test_state_seeds_and_exposes_server_state(oop_state):
+    assert isinstance(oop_state.server, ServerState)
+    assert oop_state.server.system["ip_address"] == "10.11.7.42"
+
+
+def test_persist_writes_the_server_section(oop_state):
+    oop_state.server.system["hostname"] = "maze-server.thuas.nl"
+    oop_state.persist()
+    payload = json.loads(oop_state.USER_STATE_PATH.read_text(encoding="utf-8"))
+    assert payload["server"]["system"]["hostname"] == "maze-server.thuas.nl"
+
+
+def test_load_restores_the_server_section(oop_state):
+    oop_state.server.system["pkg_upgraded"] = True
+    oop_state.persist()
+    reloaded = State()
+    reloaded.USER_STATE_PATH = oop_state.USER_STATE_PATH
+    reloaded.data = json.loads(oop_state.USER_STATE_PATH.read_text(encoding="utf-8"))
+    reloaded.normalize_state()
+    assert reloaded.server.system["pkg_upgraded"] is True
+
+
+def test_normalize_backfills_the_new_flag_and_item(oop_state):
+    del oop_state.data["flags"]["lab_server_provisioned"]
+    del oop_state.data["items"]["server_provisioning_certificate"]
+
+    oop_state.normalize_state()
+
+    assert oop_state.flags["lab_server_provisioned"] is False
+    assert (
+        oop_state.items["server_provisioning_certificate"]["name"]
+        == "Server Provisioning Certificate"
+    )
+
+
+def test_room_descriptions_are_unique_and_present(oop_state):
+    descriptions = [room.get("description") for room in oop_state.rooms.values()]
+
+    assert len(descriptions) == len(oop_state.rooms)
+    assert all(desc and desc.strip() for desc in descriptions)
+    assert len(set(descriptions)) == len(descriptions), (
+        "two rooms share the same copy-pasted description"
+    )
+
 
 def test_mapping_protocol_and_properties(oop_state):
     state = oop_state
@@ -74,7 +122,6 @@ def test_normalize_migrates_legacy_state(oop_state):
         "value": "1:02:03",
         "pause": False,
     }
-    assert state.items["secret_key"]["name"] == "Secret Key"
     assert state.flags["tr4_secret_key_copied"] is False
     assert state.rooms["teachers_room_4"]["interactables"]["computer"]
 
@@ -99,11 +146,11 @@ def test_normalize_accepts_partial_duration_dict(oop_state):
     }
 
 
-def test_persist_writes_only_mutable_state(oop_state):
+def test_persist_writes_state_and_static_data(oop_state):
     oop_state.persist()
     payload = json.loads(oop_state.USER_STATE_PATH.read_text(encoding="utf-8"))
-    assert "rooms" not in payload
-    assert "items" not in payload
+    assert "rooms" in payload
+    assert "items" in payload
     assert payload["running"] is True
     assert payload["player"]["name"] == "tester"
     assert payload["session"]["phase"] == "EXPLORATION"
@@ -278,7 +325,7 @@ def test_load_restores_save_and_static_data(oop_state):
 
 
 def test_move_direction_and_room_name(oop_state):
-    ok, msg = oop_state.move({"target": "east"})
+    ok, msg = oop_state.move({"target": "south"})
     assert ok
     assert oop_state.player["current_room"] == "teachers_room_1"
     assert oop_state.player["move"] == ["lobby"]
@@ -290,7 +337,7 @@ def test_move_direction_and_room_name(oop_state):
 
 
 def test_move_back_and_forward(oop_state):
-    oop_state.move({"target": "east"})
+    oop_state.move({"target": "south"})
     oop_state.move({"target": "back"})
     assert oop_state.player["current_room"] == "lobby"
     assert oop_state.player["forward"] == ["teachers_room_1"]
@@ -311,17 +358,41 @@ def test_move_reports_bad_destinations(oop_state):
 
 
 def test_move_enforces_locks(oop_state):
-    oop_state.player["current_room"] = "classroom_d_2035"
+    oop_state.player["current_room"] = "classroom_d2_035"
 
     ok, msg = oop_state.move({"target": "project_room_1"})
     assert not ok
     assert "locked" in msg.lower()
-    assert oop_state.player["current_room"] == "classroom_d_2035"
+    assert oop_state.player["current_room"] == "classroom_d2_035"
 
     oop_state.player["inventory"].append("keycard_lvl1")
     ok, _ = oop_state.move({"target": "project_room_1"})
     assert ok
     assert oop_state.player["current_room"] == "project_room_1"
+
+
+def test_move_requires_all_listed_items(oop_state):
+    oop_state.rooms["vault"] = {
+        "name": "Vault",
+        "description": "Storage",
+        "exits": {},
+        "items": [],
+        "restricted": True,
+        "requires": ["red_led", "green_led"],
+    }
+    oop_state.rooms["lobby"]["exits"]["up"] = "vault"
+
+    oop_state.player["inventory"] = ["red_led"]
+    ok, msg = oop_state.move({"target": "vault"})
+    assert not ok
+    assert "Red Light Emitting Diode" in msg
+    assert "Green Light Emitting Diode" in msg
+    assert oop_state.player["current_room"] == "lobby"
+
+    oop_state.player["inventory"] = ["red_led", "green_led"]
+    ok, _ = oop_state.move({"target": "vault"})
+    assert ok
+    assert oop_state.player["current_room"] == "vault"
 
 
 def test_move_rejects_restricted_room_without_requirement(oop_state):
@@ -366,7 +437,7 @@ def test_reset_reloads_default_and_static_data(oop_state):
 
     oop_state.reset()
 
-    assert oop_state.player["name"] == "guest"
+    assert oop_state.player["name"] is None
     assert oop_state.session["phase"] == "EXPLORATION"
     assert "rooms" in oop_state.data
     assert "items" in oop_state.data

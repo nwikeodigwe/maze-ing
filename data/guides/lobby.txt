@@ -1,0 +1,48 @@
+Welcome to A-maze-ing Delft!
+
+Let's get the awkward part out of the way first: this is one of those
+text adventures where you type things. Commands like `look` and `go east`.
+If you're under thirty, think of it as a very slow video game. If you're
+over thirty, welcome home.
+
+You're a student at THUAS - The Hague University of Applied Sciences -
+and somebody has to build a robot. That somebody is you. Why you? Let's
+not dwell on it. Funding ran out, the deadline is basically now, and the
+parts are... somewhere in this building. Probably a filing cabinet. Or
+under a desk. Buildings are like that.
+
+Your job sounds simple:
+1. Wander the building and pocket every part and secret you find.
+2. Assemble it all at the workbench in the lab.
+3. Get the maze-server in Lab D 2001 configured and running.
+   The robot's brain lives there. No server? No robot.
+4. Activate the robot and make a new best friend.
+
+HOW TO PLAY
+`look`              squint at the room you're standing in.
+`go <direction>`    head north, south, east or west (or `go <room>`).
+`inspect <thing>`   poke it. Read notes. Chat to terminals.
+`take <item>`       pocket it. `drop <item>` when the guilt sets in.
+`inventory`         check your pockets.
+`use <item>`        try it. `use <item> on <thing>` to be specific.
+`enter <code>`      keypads love this one.
+`help`              the panic button.
+`save` / `load`     heroes save often. Be a hero.
+
+FIRST THINGS FIRST
+Go west to the front desk and `register <name>`. The receptionist is
+very kind about it. You can't save without registering, and you'll want
+to save before doing the thing we both know is coming.
+
+You start here in the lobby. Around you: a classroom, a teachers' room,
+and an east corridor that absolutely leads somewhere. Type `inspect
+guide` in any room and one of these will explain that room. It's me.
+I'm the guide. Hi.
+
+ONE SMALL WARNING
+The two labs are called Lab D 2001 and Lab D2 002. Yes, different
+formats. Nobody knows why. The whiteboard says "historical reasons",
+which is campus-speak for "someone renamed a folder".
+
+Good luck out there. Try not to break the server - and if you do, the
+guide in Lab D 2001 will walk you through fixing it. You've got this.

@@ -75,12 +75,12 @@ def test_parse_go_details(parser):
 
 
 def test_parse_use_with_indirect(parser):
-    verb, details = parser.parse("use battery pack on workbench")
+    verb, details = parser.parse("use esp32 on workbench")
     assert verb == "use"
     assert details == {
-        "target": "battery_pack",
+        "target": "development_board",
         "indirect": "workbench",
-        "raw": "battery pack on workbench",
+        "raw": "esp32 on workbench",
     }
 
 

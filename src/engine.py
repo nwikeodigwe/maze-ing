@@ -1,5 +1,7 @@
 import textwrap
 
+from collections import Counter
+
 from datetime import datetime, timezone
 from typing import Any
 from logger import logger
@@ -7,7 +9,8 @@ from src.models.scoreboard import Scoreboard
 from src.models.user import User
 from src.phase import Phase
 from src.rooms.front_desk import FrontDesk
-from src.rooms.lab import Lab
+from src.rooms.lab_d2_002 import LabD2002
+from src.rooms.lab_d2_001 import LabD2001
 from src.rooms.lobby import Lobby
 from src.rooms.teachers_room_1 import TeachersRoomOne
 from src.rooms.teachers_room_2 import TeachersRoomTwo
@@ -24,7 +27,7 @@ STATUS_FLAG_LABELS = {
     "lab_power_on": "Lab power restored",
 }
 
-class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, TeachersRoomFour):
+class Engine(Phase, FrontDesk, Lobby, LabD2001, LabD2002, TeachersRoomOne, TeachersRoomTwo, TeachersRoomFour):
     def __init__(self, color: Colors | None = None) -> None:
         super().__init__()
         self.scoreboard = Scoreboard()
@@ -50,16 +53,20 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
             return
 
         assembly_parts_count = 0
-        for item in self.player["inventory"]:
-            item_data = self.items[item]
+        for item_id, count in Counter(self.player["inventory"]).items():
+            item_data = self.items[item_id]
 
             if item_data["is_assembly_part"]:
-                assembly_parts_count += 1
+                assembly_parts_count += count
                 tag = f" {self.colorize('[ASSEMBLY PART]', self.color.BRIGHT_GREEN)}"
             else:
                 tag = ""
 
-            self.out(f" • {self.colorize(item_data['name'], self.color.BRIGHT_YELLOW)}{tag}")
+            quantity = f" x{count}" if count > 1 else ""
+            self.out(
+                f" • {self.colorize(item_data['name'], self.color.BRIGHT_YELLOW)}"
+                f"{quantity}{tag}"
+            )
             self.out(f"   {self.colorize(item_data['description'], self.color.DIM)}")
 
         self.out(
@@ -135,7 +142,10 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
         elif target == "desk" and current_room == "teachers_room_1":
             self.inspect_desk()
             return None
-        elif target == "workbench" and current_room == "lab_d2_001":
+        elif target == "server" and current_room == "lab_d2_001":
+            self.inspect_server()
+            return None
+        elif target == "workbench" and current_room == "lab_d2_002":
             self.render_workbench()
             return None
         elif target == "whiteboard" and current_room == "teachers_room_2":
@@ -149,6 +159,9 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
             return None
         elif target == "note" and current_room == "teachers_room_4":
             self.inspect_note()
+            return None
+        elif target == "guide" and "guide" in self.state.rooms[current_room]["interactables"]:
+            self.inspect_guide()
             return None
         else:
             self.render(
@@ -173,7 +186,7 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
         if self.player["current_room"] == "teachers_room_1":
             self.use_desk_code(item, target)
             return None
-        if self.player["current_room"] == "lab_d2_001":
+        if self.player["current_room"] == "lab_d2_002":
             self.use_on_workbench(item)
             return None
         else:
@@ -186,9 +199,10 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
                     )
                 )
                 return None
+            name = self.items.get(item, {}).get("name", item)
             self.render(
                 text=self.colorize(
-                    f"You cannot use that {item} on {target}.", color_code=self.color.RED
+                    f"You cannot use that {name} on {target}.", color_code=self.color.RED
                 )
             )
             return None
@@ -202,13 +216,28 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
         item = details["target"]
         current_room = self.player["current_room"]
         room_data = self.rooms[current_room]
+        name = self.items.get(item, {}).get("name", item)
         if item not in room_data["items"]:
-            self.render(text=self.colorize(f"There is no '{item}' here.", color_code=self.color.RED))
+            self.render(text=self.colorize(f"There is no '{name}' here.", color_code=self.color.RED))
+            return None
+        if current_room == "store":
+            self.render(
+                text=self.colorize(
+                    "You can only drop items in here", color_code=self.color.RED
+                )
+            )
+            return None
+        if len(self.state.player["inventory"]) >= 11:
+            self.render(
+                text=self.colorize(
+                    "Unfortunately you can't fit in anymore items in your inventory",
+                    color_code=self.color.RED,
+                )
+            )
             return None
         room_data["items"].remove(item)
         self.player["inventory"].append(item)
-        itm = self.items[item]
-        self.render(self.colorize(f"You picked up {itm['name']}", self.color.BRIGHT_GREEN))
+        self.render(self.colorize(f"You picked up {name}", self.color.BRIGHT_GREEN))
         return None
 
     def drop(self, details: Any) -> None:
@@ -507,11 +536,15 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
         installed = len(self.workbench["installed_parts"])
 
         inv = self.player["inventory"]
+        counts = Counter(inv)
         inventory_names = [
-            self.items[item_id]["name"] for item_id in inv
+            f"{self.items[item_id]['name']}"
+            + (f" x{count}" if count > 1 else "")
+            for item_id, count in counts.items()
         ]
         assembly_parts = sum(
-            1 for item_id in inv if self.items[item_id]["is_assembly_part"]
+            count for item_id, count in counts.items()
+            if self.items[item_id]["is_assembly_part"]
         )
 
         required = len(self.workbench["required_parts"])
@@ -523,8 +556,9 @@ class Engine(Phase, FrontDesk, Lobby, Lab, TeachersRoomOne, TeachersRoomTwo, Tea
         if completed:
             challenge_text += " " + ", ".join(completed)
 
+        player_name = (self.player.setdefault("name") or "guest").title()
         rows = [
-            ("Name", self.player["name"].title()),
+            ("Name", player_name),
             ("Room", room_name),
             ("Phase", self.session["phase"]),
             None,

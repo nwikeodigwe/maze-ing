@@ -171,9 +171,10 @@ class TeachersRoomFour(Room):
                 break
 
     def inspect_note(self) -> None:
-        """Handle inspecting note in teachers room 4"""
+        """Handle inspecting the note in teachers room 4."""
         current_room = self.player["current_room"]
-        desc = self.rooms[current_room]["interactables"]["note"]
+        interactables = self.rooms[current_room].get("interactables", {})
+        desc = interactables.get("note") or interactables.get("guide", "")
         self.render(desc)
         return None
 
@@ -187,8 +188,8 @@ class TeachersRoomFour(Room):
         Returns:
             None.
         """
-        self.session["duration"]["pause"] = True
         try:
+            self.session["duration"]["pause"] = True
             loader(
                 loading_time=1.2,
                 label="Booting up the computer...",
