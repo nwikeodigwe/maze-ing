@@ -11,6 +11,7 @@ from typing import Any
 
 from src.alias import Alias
 from src.models.save import Save
+from src.server_state import ServerState
 from src.utils.time import calculate_duration, parse_time_str
 from src.utils.colors import Colors
 
@@ -18,14 +19,17 @@ from src.utils.colors import Colors
 class State:
     """In-memory game state plus persistence helpers.
 
-    ``data`` is the single mutable source of truth. Configurable/static data
-    (rooms, items, help text) is loaded from separate JSON files and merged in
-    so callers can use either object attributes (``state.player``) or mapping
-    access (``state["player"]``).
+    ``data`` is the single mutable source of truth. Static data (rooms, items)
+    is merged in from the default template, and help text is loaded from
+    ``data/help.json``, so callers can use either object attributes
+    (``state.player``) or mapping access (``state["player"]``).
     """
 
     _PERSIST_KEYS = (
         "player",
+        "rooms",
+        "items",
+        "server",
         "workbench",
         "flags",
         "session",
@@ -45,8 +49,6 @@ class State:
         self.DATA_DIR = self.PROJECT_ROOT / "data"
         self.DEFAULT_GAME_STATE_PATH = self.DATA_DIR / "default.json"
         self.USER_STATE_PATH = self.DATA_DIR / "user.json"
-        self.ROOMS_STATE_PATH = self.DATA_DIR / "rooms.json"
-        self.ITEMS_STATE_PATH = self.DATA_DIR / "items.json"
         self.HELP_COMMANDS_PATH = self.DATA_DIR / "help.json"
         self.SAVE_DIR = self.DATA_DIR / "saves"
 
@@ -111,6 +113,13 @@ class State:
         return self.data["items"]
 
     @property
+    def server(self) -> ServerState:
+        """The Lab D 2001 server-provisioning challenge state."""
+        if "server" not in self.data:
+            self.data["server"] = ServerState.default()
+        return ServerState(self.data["server"])
+
+    @property
     def running(self) -> bool:
         return bool(self.data.get("running", True))
 
@@ -153,12 +162,26 @@ class State:
         self.session["duration"]["last_write"] = datetime.now(timezone.utc).isoformat()
 
     def __load_static(self) -> None:
-        self.data["rooms"] = json.loads(
-            self.ROOMS_STATE_PATH.read_text(encoding="utf-8")
-        )
-        self.data["items"] = json.loads(
-            self.ITEMS_STATE_PATH.read_text(encoding="utf-8")
-        )
+        """Fill rooms and items from the default template when absent.
+
+        Rooms and items are persisted in ``user.json`` so progression survives a
+        reload; they are only pulled from ``data/default.json`` for fresh or
+        pre-persistence saves that do not carry them yet.
+        """
+        default = json.loads(self.DEFAULT_GAME_STATE_PATH.read_text(encoding="utf-8"))
+        if "rooms" not in self.data:
+            self.data["rooms"] = default.get("rooms", {})
+        if "items" not in self.data:
+            self.data["items"] = default.get("items", {})
+        if "server" not in self.data:
+            self.data["server"] = default.get("server", ServerState.default())
+        items = self.data.get("items", {})
+        # Required assembly parts are derived from the item flags, so the
+        # workbench always stays in sync with the item definitions.
+        workbench = self.data.setdefault("workbench", {})
+        workbench["required_parts"] = [
+            item_id for item_id, meta in items.items() if meta.get("is_assembly_part")
+        ]
 
     # -- normalisation ----------------------------------------------------
     def __migrate_room_ids(self) -> None:
@@ -189,18 +212,12 @@ class State:
                 self.data["previous_room"] = new
 
     def __backfill_terminal_state(self) -> None:
-        """Add terminal item, flag and interactable data missing from older saves."""
-        items = self.data.setdefault("items", {})
-        if "secret_key" not in items:
-            try:
-                default_items = json.loads(
-                    self.ITEMS_STATE_PATH.read_text(encoding="utf-8")
-                )
-                default_key = default_items.get("secret_key")
-            except (OSError, ValueError):
-                default_key = None
-            if default_key is not None:
-                items["secret_key"] = default_key
+        """Add flag and interactable data missing from older saves."""
+        default = json.loads(self.DEFAULT_GAME_STATE_PATH.read_text(encoding="utf-8"))
+        for flag, value in default.get("flags", {}).items():
+            self.data.setdefault("flags", {}).setdefault(flag, value)
+        for item_id, meta in default.get("items", {}).items():
+            self.data.setdefault("items", {}).setdefault(item_id, meta)
 
         self.data.setdefault("flags", {}).setdefault("tr4_secret_key_copied", False)
 
@@ -421,9 +438,13 @@ class State:
         if not target_data:
             return False, f"Unknown destination '{target_id}'."
 
-        requires = target_data.get("requires")
-        if requires and requires not in self.player["inventory"]:
-            return False, f"The door is locked. Access requires: {requires}."
+        requires = target_data.get("requires") or []
+        if isinstance(requires, str):
+            requires = [requires]
+
+        if requires and not all(rid in self.player["inventory"] for rid in requires):
+            names = ", ".join(self.items[rid]["name"] for rid in requires)
+            return False, f"The door is locked. Access requires: {names}."
 
         if target_data.get("restricted") and not requires:
             return False, "The door is locked."
