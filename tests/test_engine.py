@@ -629,3 +629,18 @@ def test_inspect_guide_quits_on_q(oop_state, tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "line 1" in out
     assert "line 5" not in out
+
+def test_inspect_server_runs_the_terminal_session(oop_engine, monkeypatch):
+    oop_engine.player["current_room"] = "lab_d2_001"
+    oop_engine.session["duration"]["value"] = "0:05:00"
+    monkeypatch.setattr("src.rooms.lab_d2_001.loader", lambda **kwargs: None)
+    commands = iter(["cd /etc", "exit"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(commands))
+
+    oop_engine.inspect_server()
+
+    # The shell really ran and moved the shared server session.
+    assert oop_engine.state.server.session["cwd"] == "/etc"
+    # The terminal session is not charged to the player, and the clock resumes.
+    assert oop_engine.session["duration"]["value"] == "0:05:00"
+    assert oop_engine.session["duration"]["pause"] is False
