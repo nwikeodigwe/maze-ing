@@ -5,7 +5,10 @@
 *.pyc
 .coverage/*
 data/saves/*
-data/user.json
+data/session/user.json
+docs/superpowers/*
+.superpowers
+specs/*
 data/game.db
 data/game.log
 .mailmap

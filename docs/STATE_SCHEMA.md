@@ -14,7 +14,67 @@ The `game_state` object is the single source of truth for the game runtime. It t
 
 ## 2. Root Structure & Key Specifications
 
-The root object contains `game_phase`, `running`, `player`, `workbench`, `flags`, `items`, and `rooms`. See detailed definitions below and the full template in Section 4.
+The root object contains `game_phase`, `running`, `player`, `workbench`, `flags`, `items`, `server`, and `rooms`. See detailed definitions below and the full template in Section 4.
+
+The `workbench.required_parts` list is **derived**, not authored: on every load the state fills it with the ids of every item whose `is_assembly_part` flag is true, so the parts the player must install always match the item data.
+
+### Server Challenge State (`server`)
+
+The Lab D 2001 provisioning challenge. It is persisted with the rest of the game, so a player can leave the lab and resume exactly where they were.
+
+```json
+"server": {
+    "session": {
+        "machine": "string",
+        "user": "string",
+        "cwd": "string",
+        "prompt_symbol": "string",
+        "connected_via_ssh": "boolean",
+        "pending_prompt": null
+    },
+    "filesystem": {
+        "/absolute/path": {
+            "type": "file",
+            "content": "string",
+            "perms": "string",
+            "owner": "string",
+            "parsed": {}
+        },
+        "/absolute/path": { "type": "dir", "perms": "string", "owner": "string" }
+    },
+    "system": {
+        "ip_address": "string",
+        "known_hosts": ["string"],
+        "pkg_index_updated": "boolean",
+        "pkg_upgraded": "boolean",
+        "admin_user": "string",
+        "users": { "user": { "sudo": "boolean", "has_ssh_key": "boolean" } },
+        "hostname": "string",
+        "timezone": "string",
+        "ntp_synced": "boolean",
+        "firewall": {
+            "active": "boolean",
+            "default_incoming": "string",
+            "default_outgoing": "string",
+            "allowed_ports": ["int"]
+        },
+        "services": {
+            "sshd": { "installed": "boolean", "running": "boolean", "enabled": "boolean", "port": "int" },
+            "nginx": { "installed": "boolean", "running": "boolean", "enabled": "boolean", "port": "int" }
+        },
+        "health_verified": {
+            "service_status_checked": "boolean",
+            "ports_checked": "boolean",
+            "logs_or_http_checked": "boolean"
+        }
+    }
+}
+```
+
+- `session.pending_prompt` is `null`, or the sub-prompt the shell is waiting on (`ssh_host_key`, `apt_confirm`, `ufw_confirm`, `adduser_password`).
+- `filesystem` is a flat map keyed by absolute path. Config files store their text in `content`; the fields the game checks are derived from that text into `parsed` by a per-file parser.
+- The challenge is complete when all eleven step predicates hold; the `checklist` command shows the player which are done.
+
 
 ## 3. Detailed Field Definitions
 
@@ -48,6 +108,7 @@ Dictionary of boolean keys used for tracking non-item progression events.
 | `tr4_drawer_decrypted`     | boolean | false   | true when the desk in teachers_room_4 is searched/decrypted.        |
 | `tr4_secret_key_copied`    | boolean | false   | true when the secret file in teachers_room_4 is read; key copied.   |
 | `lab_power_on`             | boolean | false   | true when power is restored to the workbench terminal in lab_d2001. |
+| `lab_server_provisioned`   | boolean | false   | true when all eleven server provisioning steps are complete in lab_d2_001. |
 
 ### Item Entities (`items`)
 
@@ -60,6 +121,8 @@ Dictionary of boolean keys used for tracking non-item progression events.
     }
 }
 ```
+
+`server_provisioning_certificate` is awarded when the server challenge is finished. It is not an assembly part, so it never affects the robot build.
 
 ### Room Graph Entities (`rooms`)
 

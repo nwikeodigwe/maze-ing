@@ -15,7 +15,11 @@ BASE_SCORE = 1000
 EXPLORATION_POINTS_PER_MINUTE = 12
 ASSEMBLY_POINTS_PER_MINUTE = 4
 
+<<<<<<<< HEAD:src/rooms/lab.py
+class Lab(Room):
+========
 class LabD2002(Room):
+>>>>>>>> 0cf63c936f8a566f8cf5b3ac3ec52fdcb23745a8:src/rooms/lab_d2_002.py
     def __init__(self) -> None:
         super().__init__()
         self.scoreboard = Scoreboard()
@@ -51,6 +55,18 @@ class LabD2002(Room):
             self.render_workbench(
                 self.colorize(
                     text=f"Assembly incomplete. {missing} part(s) missing.",
+                    color_code=self.color.ERROR,
+                )
+            )
+            return None
+        if not self.flags.get("lab_server_provisioned"):
+            self.render_workbench(
+                self.colorize(
+                    text=(
+                        "The robot's neural link needs the maze-server backend "
+                        "provisioned first. Finish the server configuration in "
+                        "Lab D 2001."
+                    ),
                     color_code=self.color.ERROR,
                 )
             )

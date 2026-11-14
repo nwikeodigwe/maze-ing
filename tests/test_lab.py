@@ -2,13 +2,13 @@
 
 from datetime import timedelta
 
-from src.rooms.lab import Lab
+from src.rooms.lab_d2_002 import LabD2002
 
 
 def _score(exploration, assembly):
     # ``__calculate_score`` uses only class constants and its arguments, so an
     # uninitialised instance is enough and avoids constructing a database/state.
-    return Lab._Lab__calculate_score(object.__new__(Lab), exploration, assembly)
+    return LabD2002._LabD2002__calculate_score(object.__new__(LabD2002), exploration, assembly)
 
 
 def test_zero_time_scores_base():

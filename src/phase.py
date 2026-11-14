@@ -82,7 +82,7 @@ class Phase(Room):
         self.commands(verb, details)
         if (
             verb in ("UNKNOWN", "INVALID", "EMPTY")
-            and self.player["current_room"] == "lab_d2_001"
+            and self.player["current_room"] == "lab_d2_002"
         ):
             self.header()
             self.out()
