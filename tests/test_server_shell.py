@@ -233,3 +233,161 @@ def test_ssh_lockout_blocks_a_later_connection(shell):
     shell.execute("exit")
     result = shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.42")
     assert "Permission denied" in result.output
+
+def test_ufw_default_policies_and_allow_rules(shell):
+    _connected_shell(shell)
+    shell.execute("ufw default deny incoming")
+    assert shell.state.system["firewall"]["default_incoming"] == "deny"
+    shell.execute("ufw default allow outgoing")
+    assert shell.state.system["firewall"]["default_outgoing"] == "allow"
+    shell.execute("ufw allow 22/tcp")
+    shell.execute("ufw allow 80/tcp")
+    shell.execute("ufw allow 443/tcp")
+    assert set(shell.state.system["firewall"]["allowed_ports"]) == {22, 80, 443}
+
+
+def test_ufw_enable_prompts_for_confirmation(shell):
+    _connected_shell(shell)
+    result = shell.execute("ufw enable")
+    assert result.prompt is not None
+    assert "Command may disrupt existing ssh connections" in result.prompt
+    assert shell.state.system["firewall"]["active"] is False
+
+
+def test_ufw_enable_without_the_ssh_port_severs_the_session(shell):
+    _connected_shell(shell)
+    shell.execute("ufw default deny incoming")
+    shell.execute("ufw enable")
+    result = shell.answer("y")
+    assert "Broken pipe" in result.output
+    assert shell.state.session["machine"] == "thuas-workstation"
+    assert shell.state.system["firewall"]["active"] is False
+    assert shell.state.system["firewall"]["default_incoming"] == "allow"
+
+
+def test_ufw_enable_with_the_ssh_port_succeeds(shell):
+    _connected_shell(shell)
+    shell.execute("ufw default deny incoming")
+    shell.execute("ufw allow 22/tcp")
+    shell.execute("ufw enable")
+    shell.answer("y")
+    assert shell.state.system["firewall"]["active"] is True
+    assert shell.state.session["machine"] == "maze-server"
+
+
+def test_hostnamectl_and_hosts_mapping(shell):
+    _connected_shell(shell)
+    shell.execute("hostnamectl set-hostname maze-server.thuas.nl")
+    assert shell.state.system["hostname"] == "maze-server.thuas.nl"
+    shell.state.set_file_content(
+        "/etc/hosts",
+        "127.0.0.1\tlocalhost\n127.0.1.1\tmaze-server.thuas.nl maze-server\n",
+    )
+    assert shell.state.filesystem["/etc/hosts"]["parsed"]["mapped_fqdn"] is True
+
+
+def test_netplan_apply_requires_valid_yaml(shell):
+    _connected_shell(shell)
+    shell.state.set_file_content(
+        "/etc/netplan/50-cloud-init.yaml",
+        "network:\n  version: 2\n  ethernets:\n   eth0:\n      dhcp4: true\n",
+    )
+    result = shell.execute("netplan apply")
+    assert result.output == (
+        "/etc/netplan/50-cloud-init.yaml:5:7: Error in network definition: invalid YAML"
+    )
+
+
+def test_timedatectl_sets_ntp(shell):
+    _connected_shell(shell)
+    shell.execute("timedatectl set-timezone UTC")
+    assert shell.state.system["timezone"] == "Etc/UTC"
+    shell.execute("timedatectl set-ntp true")
+    assert shell.state.system["ntp_synced"] is True
+
+
+def test_timedatectl_status_shows_the_clock(shell):
+    _connected_shell(shell)
+    output = shell.execute("timedatectl status").output
+    assert "System clock synchronized: no" in output
+
+
+def test_nginx_install_configure_and_enable(shell):
+    _connected_shell(shell)
+    shell.execute("apt update")
+    shell.execute("apt install nginx")
+    assert shell.state.system["services"]["nginx"]["installed"] is True
+
+    shell.execute("mkdir -p /etc/nginx/sites-available")
+    shell.state.set_file_content(
+        "/etc/nginx/sites-available/app",
+        "server {\n  listen 80;\n  root /var/www/maze;\n}\n",
+    )
+    shell.execute("ln -s /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app")
+    assert shell.state.filesystem["/etc/nginx/sites-enabled/app"]["type"] == "link"
+    assert shell.state.filesystem["/etc/nginx/sites-available/app"]["parsed"]["enabled"] is True
+
+    result = shell.execute("nginx -t")
+    assert result.output == "nginx: the configuration file /etc/nginx/nginx.conf syntax is ok"
+
+
+def test_nginx_t_reports_a_broken_block(shell):
+    _connected_shell(shell)
+    shell.execute("apt update")
+    shell.execute("apt install nginx")
+    shell.state.set_file_content(
+        "/etc/nginx/sites-available/app",
+        "server {\n  listen 80;\n  root /var/www/maze\n",
+    )
+    result = shell.execute("nginx -t")
+    assert "nginx: [emerg] unexpected" in result.output
+    assert "test failed" in result.output
+
+
+def test_mkdir_chown_chmod_set_permissions(shell):
+    _connected_shell(shell)
+    shell.execute("apt update")
+    shell.execute("apt install nginx")
+    shell.execute("mkdir -p /var/www/maze")
+    shell.execute("chown -R maze-admin:www-data /var/www/maze")
+    shell.execute("chmod -R 755 /var/www/maze")
+    node = shell.state.filesystem["/var/www/maze"]
+    assert node["owner"] == "maze-admin:www-data"
+    assert node["perms"] == "755"
+
+
+def test_systemctl_enable_now_starts_nginx(shell):
+    _connected_shell(shell)
+    shell.execute("apt update")
+    shell.execute("apt install nginx")
+    shell.state.set_file_content(
+        "/etc/nginx/sites-available/app",
+        "server {\n  listen 80;\n  root /var/www/maze;\n}\n",
+    )
+    shell.execute("ln -s /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app")
+    shell.execute("systemctl enable --now nginx")
+    assert shell.state.system["services"]["nginx"]["enabled"] is True
+    assert shell.state.system["services"]["nginx"]["running"] is True
+
+
+def test_verification_commands_set_the_health_flags(shell):
+    _connected_shell(shell)
+    shell.execute("apt update")
+    shell.execute("apt install nginx")
+    shell.state.set_file_content(
+        "/etc/nginx/sites-available/app",
+        "server {\n  listen 80;\n  root /var/www/maze;\n}\n",
+    )
+    shell.execute("ln -s /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app")
+    shell.execute("systemctl enable --now nginx")
+    shell.execute("mkdir -p /var/www/maze")
+    shell.execute("chmod -R 755 /var/www/maze")
+
+    shell.execute("systemctl status nginx")
+    assert shell.state.system["health_verified"]["service_status_checked"] is True
+
+    shell.execute("ss -tulpn")
+    assert shell.state.system["health_verified"]["ports_checked"] is True
+
+    shell.execute("curl -I http://localhost")
+    assert shell.state.system["health_verified"]["logs_or_http_checked"] is True
