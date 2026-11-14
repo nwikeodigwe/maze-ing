@@ -16,7 +16,42 @@ class LabD2001(Room):
             return
         self.player["inventory"].append("server_provisioning_certificate")
         name = self.items["server_provisioning_certificate"]["name"]
-        self.out(self.colorize(text=f"{name} added to your inventory!", color_code=self.color.SUCCESS))
+        self.out(
+            self.colorize(
+                text=f"{name} added to your inventory!",
+                color_code=self.color.SUCCESS,
+            )
+        )
+
+    def _run_shell(self, shell: ServerShell) -> None:
+        """Read commands from the player and feed them to the shell.
+
+        The shell may ask follow-up questions of its own; each one is answered
+        until the shell has no prompt left.
+
+        Args:
+            shell: The shell session to drive.
+        """
+        while True:
+            try:
+                raw = input(shell.prompt + " ")
+            except (EOFError, KeyboardInterrupt):
+                return
+            result = shell.execute(raw)
+            while result.prompt:
+                if result.output:
+                    self.out(result.output)
+                try:
+                    answer = input(result.prompt)
+                except (EOFError, KeyboardInterrupt):
+                    return
+                result = shell.answer(answer)
+            if result.output:
+                self.out(result.output)
+            if result.clear_requested:
+                self.clear()
+            if result.exit_requested:
+                return
 
     def inspect_server(self) -> None:
         """Open the lab workstation terminal and run the provisioning challenge.
@@ -33,32 +68,13 @@ class LabD2001(Room):
         self.session["duration"]["pause"] = True
         try:
             self.clear()
-            shell = ServerShell(self.state.server)
-            while True:
-                try:
-                    raw = input(shell.prompt + " ")
-                except (EOFError, KeyboardInterrupt):
-                    break
-                result = shell.execute(raw)
-                if result.output:
-                    print(result.output)
-                if result.prompt:
-                    try:
-                        answer = input(result.prompt)
-                    except (EOFError, KeyboardInterrupt):
-                        break
-                    result = shell.answer(answer)
-                    if result.output:
-                        print(result.output)
-                if result.clear_requested:
-                    self.clear()
-                if result.exit_requested:
-                    break
+            self._run_shell(ServerShell(self.state.server))
         finally:
             # auto() rebases the timestamp while the clock is still paused, so
             # the time spent in the terminal is discarded rather than charged.
             self.auto()
             self.session["duration"]["pause"] = False
+            self.persist()
             self.clear()
             self.render()
         if self.state.server.complete:

@@ -648,6 +648,9 @@ class ServerShell:
     def answer(self, text: str) -> ShellResult:
         """Resolve the pending sub-prompt with the player's answer.
 
+        The pending prompt is only cleared by the handler that finishes it, so
+        a question that needs a follow-up answer keeps asking.
+
         Args:
             text: What the player typed.
 
@@ -657,22 +660,28 @@ class ServerShell:
         pending = self.state.session.get("pending_prompt")
         if not pending:
             return ShellResult()
-        self.state.session["pending_prompt"] = None
         handler = getattr(self, f"_answer_{pending.get('kind')}", None)
         if handler is None:
+            self.state.session["pending_prompt"] = None
             return ShellResult()
         return handler(text, pending)
+
+    def _clear_pending(self) -> None:
+        """Drop the pending sub-prompt."""
+        self.state.session["pending_prompt"] = None
 
     def _answer_ssh_host_key(self, text: str, pending: dict) -> ShellResult:
         """Resolve the SSH host-key confirmation prompt."""
         host = pending.get("host", SERVER_IP)
         answer = text.strip().lower()
         if answer == "yes":
+            self._clear_pending()
             known_hosts = self.state.system.setdefault("known_hosts", [])
             if host not in known_hosts:
                 known_hosts.append(host)
             return self._connect(pending.get("user", "root"), pending.get("key"))
         if answer == "no":
+            self._clear_pending()
             return ShellResult(output=f"Connection to {host} closed.")
         return ShellResult(prompt="Please type 'yes', 'no' or the fingerprint: ")
 
@@ -870,6 +879,11 @@ class ServerShell:
                     "Connection timed out"
                 )
             )
+        server_port = self.state.system.get("services", {}).get("sshd", {}).get(
+            "port", 22
+        )
+        if port is not None and int(port) != server_port:
+            return ShellResult(output=f"{user}@{host}: Connection refused")
         key_path = self._resolve(key) if key else ""
         if not key or self._node(key_path) is None:
             return ShellResult(output=f"{user}@{host}: Permission denied (publickey).")
@@ -896,11 +910,19 @@ class ServerShell:
     def _ssh_allows(self, user: str) -> bool:
         """True when the sshd configuration still lets this user in."""
         parsed = self.state.filesystem.get("/etc/ssh/sshd_config", {}).get("parsed", {})
-        entry = self.state.system.get("users", {}).get(user)
+        users = self.state.system.get("users", {})
+        entry = users.get(user)
         if entry is None:
             return False
         if user == "root" and parsed.get("PermitRootLogin") == "no":
-            return False
+            # The player cannot be locked out before an admin account exists,
+            # since only an admin key lets them get back in.
+            has_admin_key = any(
+                info.get("has_ssh_key") for name, info in users.items() if name != "root"
+            )
+            if has_admin_key:
+                return False
+            return True
         return bool(entry.get("has_ssh_key"))
 
     def _connect(self, user: str, key_path: str | None = None) -> ShellResult:
@@ -931,9 +953,14 @@ class ServerShell:
             if arg == "-":
                 continue
             name = arg
+        current = self.state.session["user"]
+        users = self.state.system.get("users", {})
+        current_sudo = current == "root" or bool(users.get(current, {}).get("sudo"))
+        if not current_sudo:
+            return ShellResult(output="su: Authentication failure")
         if name is None:
-            name = "root"
-        if name not in self.state.system.get("users", {}):
+            return ShellResult(output="su: no user specified")
+        if name not in users:
             return ShellResult(output=f"su: user '{name}' does not exist")
         session = self.state.session
         session["user"] = name
@@ -990,6 +1017,7 @@ class ServerShell:
 
     def _answer_apt_confirm(self, text: str, pending: dict) -> ShellResult:
         """Resolve the package-upgrade confirmation prompt."""
+        self._clear_pending()
         if text.strip().lower() in ("", "y", "yes"):
             self.state.system["pkg_upgraded"] = True
             return ShellResult(
@@ -1044,7 +1072,11 @@ class ServerShell:
             pending["stage"] = "confirm"
             return ShellResult(prompt="Is the information correct? [Y/n] ")
         if text.strip().lower() in ("", "y", "yes"):
-            return ShellResult(output=f"useradd: user '{name}' created with home directory")
+            self._clear_pending()
+            return ShellResult(
+                output=f"useradd: user '{name}' created with home directory"
+            )
+        self._clear_pending()
         self.state.system.get("users", {}).pop(name, None)
         if self.state.system.get("admin_user") == name:
             self.state.system["admin_user"] = None
@@ -1285,6 +1317,7 @@ class ServerShell:
 
     def _answer_ufw_confirm(self, text: str, pending: dict) -> ShellResult:
         """Resolve the firewall activation prompt."""
+        self._clear_pending()
         firewall = self.state.system.get("firewall", {})
         if text.strip().lower() not in ("y", "yes"):
             return ShellResult(output="Command cancelled")
@@ -1395,6 +1428,11 @@ class ServerShell:
             )
         for target in self._with_descendants(path):
             self.state.filesystem[target]["owner"] = owner
+            if posixpath.basename(target) == "authorized_keys":
+                user = owner.split(":")[0]
+                users = self.state.system.get("users", {})
+                if user in users:
+                    users[user]["has_ssh_key"] = True
         return ShellResult()
 
     def _cmd_chmod(self, args: list[str]) -> ShellResult:
@@ -1422,15 +1460,20 @@ class ServerShell:
         ]
 
     def _cmd_cp(self, args: list[str]) -> ShellResult:
-        """Copy a file."""
+        """Copy a file, into a directory when the destination is one."""
         words = [arg for arg in args if not arg.startswith("-")]
         if len(words) < 2:
             return ShellResult(output="cp: missing destination file operand")
-        source, destination = self._resolve(words[0]), self._resolve(words[1])
-        node = self._node(source)
+        source_path = self._resolve(words[0])
+        destination = self._resolve(words[1])
+        node = self._node(source_path)
         if node is None:
             return ShellResult(
                 output=f"cp: cannot stat '{words[0]}': No such file or directory"
+            )
+        if self._is_dir(destination):
+            destination = posixpath.join(
+                destination, posixpath.basename(source_path)
             )
         copy = dict(node)
         copy["owner"] = f"{self.state.session['user']}:{self.state.session['user']}"
@@ -1445,10 +1488,6 @@ class ServerShell:
             return ShellResult(output="ln: missing operand")
         target, link = self._resolve(args[1]), self._resolve(args[2])
         self.state.filesystem[link] = {"type": "link", "target": target}
-        if link.startswith("/etc/nginx/sites-enabled/"):
-            site = self.state.filesystem.get("/etc/nginx/sites-available/app")
-            if site is not None:
-                site.setdefault("parsed", {})["enabled"] = True
         return ShellResult()
 
     def _cmd_nginx(self, args: list[str]) -> ShellResult:
@@ -1539,13 +1578,19 @@ class ServerShell:
         )
 
     def _cmd_checklist(self, args: list[str]) -> ShellResult:
-        """Print the provisioning steps and how far the player has got."""
+        """Print the provisioning steps and how far the player has got.
+
+        Only the first incomplete step is hinted, so the checklist tracks work
+        without handing the player a full walkthrough.
+        """
         lines = []
+        hinted = False
         for number, step in enumerate(self.state.steps(), start=1):
             mark = "[x]" if step.done else "[ ]"
             lines.append(f"{mark} Step {number} - {step.title}")
-            if not step.done and step.hint:
+            if not step.done and not hinted and step.hint:
                 lines.append(f"      {step.hint}")
+                hinted = True
         return ShellResult(output="\n".join(lines))
 
     # -- editing files ------------------------------------------------------

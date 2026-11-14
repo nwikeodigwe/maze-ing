@@ -122,6 +122,47 @@ def test_a_command_answers_the_pending_prompt(shell):
     assert shell.state.session["connected_via_ssh"] is True
 
 
+FULL_PROVISIONING_SCRIPT = [
+        "ssh -i ~/.ssh/id_ed25519 root@10.11.7.42",
+        "yes",
+        "apt update",
+        "apt upgrade -y",
+        "adduser maze-admin",
+        "secret",
+        "secret",
+        "",
+        "usermod -aG sudo maze-admin",
+        "rsync --archive --chown=maze-admin:maze-admin ~/.ssh /home/maze-admin",
+        "nano /etc/ssh/sshd_config",
+        "sshd -t",
+        "systemctl reload sshd",
+        "ufw default deny incoming",
+        "ufw default allow outgoing",
+        "ufw allow 22/tcp",
+        "ufw allow 80/tcp",
+        "ufw allow 443/tcp",
+        "ufw enable",
+        "y",
+        "hostnamectl set-hostname maze-server.thuas.nl",
+        "nano /etc/hosts",
+        "nano /etc/netplan/50-cloud-init.yaml",
+        "netplan apply",
+        "timedatectl set-timezone UTC",
+        "timedatectl set-ntp true",
+        "apt install nginx",
+        "nano /etc/nginx/sites-available/app",
+        "ln -s /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app",
+        "nginx -t",
+        "mkdir -p /var/www/maze",
+        "chown -R maze-admin:www-data /var/www/maze",
+        "chmod -R 755 /var/www/maze",
+        "systemctl enable --now nginx",
+        "systemctl status nginx",
+        "ss -tulpn",
+        "curl -I http://localhost",
+    ]
+
+
 def _connected_shell(shell):
     """Connect the shell to the server, accepting the host key."""
     shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.42")
@@ -224,15 +265,17 @@ def test_systemctl_reload_sshd_requires_valid_syntax(shell):
     )
 
 
-def test_ssh_lockout_blocks_a_later_connection(shell):
+def test_ssh_lockout_only_arms_once_an_admin_key_exists(shell):
+    # Hardening SSH before any admin account exists must not strand the
+    # player: root can still reconnect to create one.
     _connected_shell(shell)
     shell.state.filesystem["/etc/ssh/sshd_config"]["parsed"].update(
         {"PermitRootLogin": "no", "PasswordAuthentication": "no"}
     )
     shell.execute("systemctl reload sshd")
     shell.execute("exit")
-    result = shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.42")
-    assert "Permission denied" in result.output
+    shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.42")
+    assert shell.state.session["connected_via_ssh"] is True
 
 def test_ufw_default_policies_and_allow_rules(shell):
     _connected_shell(shell)
@@ -325,7 +368,6 @@ def test_nginx_install_configure_and_enable(shell):
     )
     shell.execute("ln -s /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app")
     assert shell.state.filesystem["/etc/nginx/sites-enabled/app"]["type"] == "link"
-    assert shell.state.filesystem["/etc/nginx/sites-available/app"]["parsed"]["enabled"] is True
 
     result = shell.execute("nginx -t")
     assert result.output == "nginx: the configuration file /etc/nginx/nginx.conf syntax is ok"
@@ -394,7 +436,8 @@ def test_verification_commands_set_the_health_flags(shell):
 
 def test_checklist_lists_all_eleven_steps_with_progress(shell):
     output = shell.execute("checklist").output
-    assert len(output.splitlines()) == 22
+    # Eleven steps plus a hint on exactly the first incomplete one.
+    assert len(output.splitlines()) == 12
     assert "[x]" not in output
     assert "[ ]" in output
     assert "Step 1" in output
@@ -413,11 +456,13 @@ def test_checklist_marks_completed_steps(shell):
     assert "[x]" in output
 
 
-def test_checklist_hints_the_next_incomplete_step(shell):
+def test_checklist_hints_only_the_next_incomplete_step(shell):
     _connected_shell(shell)
     output = shell.execute("checklist").output
-    assert "Step 5" in output
-    assert "ufw" in output
+    assert "Step 2" in output
+    assert "apt update && apt upgrade" in output
+    # A later step must not be hinted, so the player is not handed a walkthrough.
+    assert "ufw default deny incoming" not in output
 
 def test_nano_saves_the_edited_file(shell):
     _connected_shell(shell)
@@ -457,7 +502,8 @@ def test_sed_edits_a_file_in_place(shell):
     assert parsed["PermitRootLogin"] == "no"
 
 
-def test_the_challenge_can_be_completed_end_to_end(shell):
+def _scripted_editor(shell):
+    """An editor that writes the correct content into each config file."""
     edits = {
         "/etc/ssh/sshd_config": (
             "PermitRootLogin no\nPasswordAuthentication no\nPort 22\n"
@@ -481,51 +527,184 @@ def test_the_challenge_can_be_completed_end_to_end(shell):
                 return True, content
         return True, text
 
-    shell._editor = editor
+    return editor
 
-    script = [
-        "ssh -i ~/.ssh/id_ed25519 root@10.11.7.42",
-        "yes",
-        "apt update",
-        "apt upgrade -y",
-        "adduser maze-admin",
-        "secret",
-        "secret",
-        "",
-        "usermod -aG sudo maze-admin",
-        "rsync --archive --chown=maze-admin:maze-admin ~/.ssh /home/maze-admin",
-        "nano /etc/ssh/sshd_config",
-        "sshd -t",
-        "systemctl reload sshd",
-        "ufw default deny incoming",
-        "ufw default allow outgoing",
-        "ufw allow 22/tcp",
-        "ufw allow 80/tcp",
-        "ufw allow 443/tcp",
-        "ufw enable",
-        "y",
-        "hostnamectl set-hostname maze-server.thuas.nl",
-        "nano /etc/hosts",
-        "nano /etc/netplan/50-cloud-init.yaml",
-        "netplan apply",
-        "timedatectl set-timezone UTC",
-        "timedatectl set-ntp true",
-        "apt install nginx",
-        "nano /etc/nginx/sites-available/app",
-        "ln -s /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app",
-        "nginx -t",
-        "mkdir -p /var/www/maze",
-        "chown -R maze-admin:www-data /var/www/maze",
-        "chmod -R 755 /var/www/maze",
-        "systemctl enable --now nginx",
-        "systemctl status nginx",
-        "ss -tulpn",
-        "curl -I http://localhost",
-    ]
 
-    for command in script:
+def test_the_challenge_can_be_completed_end_to_end(shell):
+    shell._editor = _scripted_editor(shell)
+
+    for command in FULL_PROVISIONING_SCRIPT:
         shell.execute(command)
 
     assert shell.state.session.get("pending_prompt") is None
     assert shell.state.complete is True
     assert [step.id for step in shell.state.steps() if not step.done] == []
+# -- Review fixes ---------------------------------------------------------
+# C3: the follow-up prompt must survive the answer, and the room loop must
+# keep asking until the shell has no prompt left.
+def test_answering_a_sub_prompt_asks_the_next_question(shell):
+    _connected_shell(shell)
+    shell.execute("adduser maze-admin")
+
+    result = shell.answer("secret")
+
+    assert result.prompt == "Retype new password: "
+    assert shell.state.session["pending_prompt"] is not None
+
+    result = shell.answer("secret")
+    assert result.prompt == "Is the information correct? [Y/n] "
+
+    result = shell.answer("")
+    assert result.prompt is None
+    assert shell.state.session["pending_prompt"] is None
+
+
+def test_answering_the_host_key_wrongly_asks_again(shell):
+    shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.42")
+
+    result = shell.answer("y")
+
+    assert result.prompt == "Please type 'yes', 'no' or the fingerprint: "
+    assert shell.state.session["pending_prompt"] is not None
+
+
+# C1: completing the challenge must survive leaving the server.
+def test_completion_survives_leaving_the_server(shell):
+    shell._editor = _scripted_editor(shell)
+    for command in FULL_PROVISIONING_SCRIPT:
+        shell.execute(command)
+
+    assert shell.state.complete is True
+
+    shell.execute("exit")
+
+    assert shell.state.complete is True
+
+
+# C2: hardening sshd before an admin user exists must not lock the player out.
+def test_ssh_still_works_before_an_admin_user_exists(shell):
+    _connected_shell(shell)
+    shell.state.filesystem["/etc/ssh/sshd_config"]["parsed"].update(
+        {"PermitRootLogin": "no", "PasswordAuthentication": "no"}
+    )
+
+    shell.execute("exit")
+    result = shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.42")
+
+    assert "Permission denied" not in result.output
+    assert shell.state.session["connected_via_ssh"] is True
+
+
+def test_ssh_denies_root_once_an_admin_user_has_a_key(shell):
+    _connected_shell(shell)
+    shell.execute("adduser maze-admin")
+    shell.answer("secret")
+    shell.answer("secret")
+    shell.answer("")
+    shell.execute("usermod -aG sudo maze-admin")
+    shell.execute(
+        "rsync --archive --chown=maze-admin:maze-admin ~/.ssh /home/maze-admin"
+    )
+    shell.state.filesystem["/etc/ssh/sshd_config"]["parsed"].update(
+        {"PermitRootLogin": "no", "PasswordAuthentication": "no"}
+    )
+
+    shell.execute("exit")
+    result = shell.execute("ssh -i ~/.ssh/id_ed25519 root@10.11.7.42")
+
+    assert "Permission denied" in result.output
+
+
+# I3: the hosts entry must be matched against the FQDN, whatever address it uses.
+def test_hosts_mapping_accepts_the_static_address(shell):
+    _connected_shell(shell)
+    shell.execute("hostnamectl set-hostname maze-server.thuas.nl")
+    shell.state.set_file_content(
+        "/etc/hosts",
+        "127.0.0.1\tlocalhost\n10.11.7.42\tmaze-server.thuas.nl maze-server\n",
+    )
+
+    assert shell.state.filesystem["/etc/hosts"]["parsed"]["mapped_fqdn"] is True
+
+
+def test_hosts_mapping_requires_the_fqdn(shell):
+    _connected_shell(shell)
+    shell.execute("hostnamectl set-hostname maze-server.thuas.nl")
+    shell.state.set_file_content(
+        "/etc/hosts",
+        "127.0.0.1\tlocalhost\n127.0.1.1\tmaze-server\n",
+    )
+
+    assert shell.state.filesystem["/etc/hosts"]["parsed"]["mapped_fqdn"] is False
+
+
+def test_hosts_mapping_is_rederived_when_the_hostname_changes(shell):
+    _connected_shell(shell)
+    shell.state.set_file_content(
+        "/etc/hosts",
+        "127.0.0.1\tlocalhost\n127.0.1.1\tmaze-server.thuas.nl maze-server\n",
+    )
+    shell.execute("hostnamectl set-hostname maze-server.thuas.nl")
+
+    assert shell.state.filesystem["/etc/hosts"]["parsed"]["mapped_fqdn"] is True
+
+
+# I4: editing the site after linking it must not un-complete the step.
+def test_editing_the_site_after_linking_keeps_the_step_done(shell):
+    _connected_shell(shell)
+    shell.execute("apt update")
+    shell.execute("apt install nginx")
+    shell.state.set_file_content(
+        "/etc/nginx/sites-available/app",
+        "server {\n  listen 80;\n  root /var/www/maze;\n}\n",
+    )
+    shell.execute(
+        "ln -s /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app"
+    )
+    shell.state.set_file_content(
+        "/etc/nginx/sites-available/app",
+        "server {\n  listen 80;\n  root /var/www/maze;\n  index index.html;\n}\n",
+    )
+
+    steps = {step.id: step for step in shell.state.steps()}
+    assert steps["nginx"].done is True
+
+
+# I5: the documented cp route must work and must not destroy a directory.
+def test_cp_into_a_directory_copies_the_file_inside(shell):
+    _connected_shell(shell)
+    shell.execute("adduser maze-admin")
+    shell.answer("secret")
+    shell.answer("secret")
+    shell.answer("")
+    shell.execute("mkdir -p /home/maze-admin/.ssh")
+    shell.execute("cp /root/.ssh/authorized_keys /home/maze-admin/.ssh/")
+    shell.execute("chown -R maze-admin:maze-admin /home/maze-admin/.ssh")
+
+    assert shell.state.filesystem["/home/maze-admin/.ssh"]["type"] == "dir"
+    assert shell.state.system["users"]["maze-admin"]["has_ssh_key"] is True
+
+
+# I1: su must not be a free root escalation.
+def test_su_needs_sudo_rights(shell):
+    result = shell.execute("su - maze-admin")
+    assert result.output == "su: Authentication failure"
+    assert shell.state.session["user"] == "player"
+
+
+def test_su_without_a_user_is_refused(shell):
+    _connected_shell(shell)
+    result = shell.execute("su")
+    assert result.output == "su: no user specified"
+    assert shell.state.session["user"] == "root"
+
+
+# I2: a wrong port must not connect.
+def test_ssh_on_the_wrong_port_is_refused(shell):
+    _connected_shell(shell)
+    shell.execute("exit")
+
+    result = shell.execute("ssh -p 9999 -i ~/.ssh/id_ed25519 root@10.11.7.42")
+
+    assert "Connection refused" in result.output
+    assert shell.state.session["connected_via_ssh"] is False
