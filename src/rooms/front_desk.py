@@ -3,6 +3,7 @@ from src.room import Room
 
 class FrontDesk(Room):
     def inspect_receptionist(self):
-        receptionist = self.rooms["front_desk"]["interactables"]["receptionist"]
-        self.render(text=receptionist)
+        interactables = self.rooms["front_desk"].get("interactables", {})
+        text = interactables.get("receptionist") or interactables.get("guide", "")
+        self.render(text=text)
         return None

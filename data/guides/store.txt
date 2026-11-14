@@ -1,0 +1,33 @@
+Adjust expectations before you loot this room: you cannot take everything
+just because you can. Sometimes you have to give back, give it your all, give
+it your love, Oh wait that was not what I meant to say, but I'm sure you know where
+I am going with this.
+
+I thought it will be really cool to have that one room completely different
+from the rest to emphasize my point on standing out and being different,
+but now that I think about it, it might have been a terrible idea.
+
+But anyways give me all your money! I mean me all your items (do not) or maybe spare some because I
+can tell your inventory might give way any moment now.
+
+Not sure what commands to use? try
+
+    drop <item>
+
+This might come as a shock, but I have been meaning to tell you this for some time now.
+There are plenty of sudo/alias commands in this game.
+
+Why did I not add them the help menu you say?
+
+I mean, I kind of enjoy out little conversation we have going on. so let's keep it going
+
+Be sure to not drop items that you need to access other rooms or assembly items. How do you
+know what items are assembly items? They have a green assembly tag next to them. And for items you
+need to access other rooms? Well, you might need to roll the dice on that one! You can also restart the
+game if you get stuck with
+
+    restart
+
+I know this is a terrible design, but I don't make the rules... Sike I do!😅
+
+Now beat it!

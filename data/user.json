@@ -1,0 +1,654 @@
+{
+    "player": {
+        "id": 1,
+        "name": "gift",
+        "current_room": "front_desk",
+        "inventory": [],
+        "move": [
+            "lobby"
+        ],
+        "forward": []
+    },
+    "rooms": {
+        "lobby": {
+            "id": "lobby",
+            "name": "Lobby",
+            "description": "The main floor lobby. A flickering terminal sits near the entrance.",
+            "restricted": false,
+            "requires": [],
+            "exits": {
+                "north": "classroom_d2_015",
+                "west": "front_desk",
+                "south": "teachers_room_1",
+                "east": "east_corridor"
+            },
+            "items": [
+                "development_board",
+                "oled_display",
+                "red_led",
+                "red_led"
+            ],
+            "interactables": {
+                "guide": "A guide to show you what required action to take in the current room",
+                "terminal": "A-maze-ing-Delft"
+            }
+        },
+        "front_desk": {
+            "id": "front_desk",
+            "name": "Front Desk",
+            "description": "The front desk of the build. here you can see the receptionist welcoming you with a smile",
+            "restricted": false,
+            "requires": [],
+            "exits": {
+                "east": "lobby"
+            },
+            "items": [
+                "obstacle_avoidance_module",
+                "830_points_breadboard"
+            ],
+            "interactables": {
+                "guide": "You can register a new profile by typing 'register <name>'"
+            }
+        },
+        "classroom_d2_015": {
+            "id": "classroom_d2_015",
+            "name": "Classroom D2 015",
+            "description": "A standard lecture hall littered with loose papers.",
+            "restricted": true,
+            "requires": [
+                "development_board"
+            ],
+            "exits": {
+                "south": "lobby",
+                "east": "classroom_d2_035"
+            },
+            "items": [
+                "photosensitive_resistor_module",
+                "green_led"
+            ],
+            "interactables": {}
+        },
+        "teachers_room_1": {
+            "id": "teachers_room_1",
+            "name": "Teachers Room 1",
+            "description": "An office filled with filing cabinets and a locked desk.",
+            "restricted": false,
+            "requires": [],
+            "exits": {
+                "west": "lobby",
+                "north": "classroom_d2_035"
+            },
+            "items": [
+                "f_m_dupont_cable",
+                "active_buzzer"
+            ],
+            "interactables": {
+                "desk": {
+                    "restricted": true,
+                    "code": "D2084",
+                    "reward": "keycard_lvl1",
+                    "hint": "Keypad hint: 'Room number where intercultural collaboration class was help was held.\nhint: D2084'"
+                }
+            }
+        },
+        "classroom_d2_035": {
+            "id": "classroom_d2_035",
+            "name": "Classroom D2 035",
+            "description": "A lab room with multiple presentation workstations.",
+            "restricted": false,
+            "requires": [],
+            "exits": {
+                "west": "classroom_d2_015",
+                "south": "teachers_room_1",
+                "east": "project_room_1"
+            },
+            "items": [
+                "resistor_220r_1k_10k"
+            ],
+            "interactables": {}
+        },
+        "project_room_1": {
+            "id": "project_room_1",
+            "name": "Project Room 1",
+            "description": "A high-tech hardware testing bay.",
+            "restricted": true,
+            "requires": [
+                "keycard_lvl1"
+            ],
+            "exits": {
+                "west": "classroom_d2_035",
+                "south": "teachers_room_2"
+            },
+            "items": [
+                "passive_buzzer"
+            ],
+            "interactables": {}
+        },
+        "east_corridor": {
+            "id": "east_corridor",
+            "name": "East Corridor",
+            "description": "The main floor lobby. A flickering terminal sits near the entrance.",
+            "restricted": false,
+            "requires": [],
+            "exits": {
+                "north": "teachers_room_2",
+                "west": "lobby",
+                "south": "project_room_1",
+                "east": "store"
+            },
+            "items": [
+                "dht11_temperature_humidity_module",
+                "button_switch"
+            ],
+            "interactables": {}
+        },
+        "store": {
+            "id": "store",
+            "name": "Store",
+            "description": "The main floor lobby. A flickering terminal sits near the entrance.",
+            "restricted": false,
+            "requires": [],
+            "exits": {
+                "west": "east_corridor"
+            },
+            "items": [
+                "hc_sr501_pir_motion_sensor",
+                "micro_usb_cable"
+            ],
+            "interactables": {
+                "guide": "A guide to show you what action to take in the current room"
+            }
+        },
+        "teachers_room_2": {
+            "id": "teachers_room_2",
+            "name": "Teachers Room 2",
+            "description": "An administrative room featuring a massive whiteboard.",
+            "restricted": null,
+            "requires": [],
+            "exits": {
+                "north": "project_room_1",
+                "east": "project_room_2",
+                "south": "east_corridor"
+            },
+            "items": [
+                "active_buzzer",
+                "f_f_dupont_cable"
+            ],
+            "interactables": {
+                "whiteboard": "Written in red marker: 'Lab Network Pass: Tr0janH0rse!'"
+            }
+        },
+        "project_room_2": {
+            "id": "project_room_2",
+            "name": "Project Room 2",
+            "description": "A robotics testing arena containing component crates.",
+            "restricted": false,
+            "requires": [],
+            "exits": {
+                "west": "teachers_room_2",
+                "south": "teachers_room_4"
+            },
+            "items": [
+                "button_switch",
+                "m_m_dupont_cable"
+            ],
+            "interactables": {}
+        },
+        "teachers_room_4": {
+            "id": "teachers_room_4",
+            "name": "Teacher Room 4",
+            "description": "The senior faculty office. Papers cover the desk.",
+            "restricted": true,
+            "requires": [
+                "keycard_lvl1"
+            ],
+            "exits": {
+                "north": "project_room_2",
+                "west": "lab_d2_001"
+            },
+            "items": [
+                "5v_2_channel_relay_module",
+                "green_led"
+            ],
+            "interactables": {
+                "computer": "Nix OS computer",
+                "guide": "On the note it says 'Explore the computer file system to see if you find anything interesting.\nhint: its super secret'"
+            }
+        },
+        "lab_d2_001": {
+            "id": "lab_d2_001",
+            "name": "Lab D 2001",
+            "description": "The final assembly lab equipped with an industrial workbench.",
+            "restricted": false,
+            "requires": [],
+            "exits": {
+                "east": "teachers_room_4",
+                "west": "lab_d2_002"
+            },
+            "items": [
+                "10k_potentiometer",
+                "red_led"
+            ],
+            "interactables": {
+                "guide": "A heavy metal table connected to a main server terminal.",
+                "server": "A heavy metal table connected to a main server terminal."
+            }
+        },
+        "lab_d2_002": {
+            "id": "lab_d2_002",
+            "name": "Lab D2 002",
+            "description": "The final assembly lab equipped with an industrial workbench.",
+            "restricted": false,
+            "requires": [],
+            "exits": {
+                "east": "lab_d2_001"
+            },
+            "items": [
+                "red_led",
+                "yellow_led"
+            ],
+            "interactables": {
+                "workbench": "A heavy metal table connected to a main server terminal."
+            }
+        }
+    },
+    "items": {
+        "secret_key": {
+            "id": "secret_key",
+            "name": "Super secret Key",
+            "description": "Encrypted schematic detailing the 8 requisite hardware modules needed to assemble the A-maze-ing-Delft prototype.",
+            "is_assembly_part": false
+        },
+        "development_board": {
+            "id": "development_board",
+            "name": "ESP32 Development Board",
+            "description": "Programmable computer designed to read inputs (like a button press or a temperature sensor) and control outputs",
+            "is_assembly_part": false
+        },
+        "oled_display": {
+            "id": "oled_display",
+            "name": "O.96 Inch OLED Display",
+            "description": "A tiny, ultra-sharp monochrome screen. Requires no backlight because every individual pixel emits its own light",
+            "is_assembly_part": false
+        },
+        "obstacle_avoidance_module": {
+            "id": "obstacle_avoidance_module",
+            "name": "Obstacle Avoidance Module",
+            "description": "A simple proximity sensor used to detect when an object is right in front of it",
+            "is_assembly_part": true
+        },
+        "830_points_breadboard": {
+            "id": "830_points_breadboard",
+            "name": "830 The-Points Breadboard",
+            "description": "a reusable prototyping board that lets you connect your ESP32, 0.96\" OLED display, and obstacle sensor together without any soldering",
+            "is_assembly_part": false
+        },
+        "photosensitive_resistor_module": {
+            "id": "photosensitive_resistor_module",
+            "name": "Photosensitive Resistor Module",
+            "description": "Measures ambient light intensity",
+            "is_assembly_part": false
+        },
+        "f_m_dupont_cable": {
+            "id": "f_m_dupont_cable",
+            "name": "F-M (Female-to-Male) DuPont Cable",
+            "description": "A flexible jumper wire with a hollow socket (Female) on one end and a solid metal pin (Male) on the other",
+            "is_assembly_part": true
+        },
+        "keycard_lvl1": {
+            "id": "keycard_lvl1",
+            "name": "Level-1 Staff Keycard",
+            "description": "A magnetic keycard. Opens restricted project and staff rooms.",
+            "is_assembly_part": false
+        },
+        "dht11_temperature_humidity_module": {
+            "id": "dht11_temperature_humidity_module",
+            "name": "DHT11 Temperature and Humidity Module",
+            "description": "All-in-one digital environmental sensor",
+            "is_assembly_part": true
+        },
+        "hc_sr501_pir_motion_sensor": {
+            "id": "hc_sr501_pir_motion_sensor",
+            "name": "HC-SR501 PIR (Passive Infrared) Motion Sensor",
+            "description": "Watches for sudden changes in body heat (infrared radiation) moving across a room up to 7 meters (23 feet) away",
+            "is_assembly_part": true
+        },
+        "micro_usb_cable": {
+            "id": "micro_usb_cable",
+            "name": "Micro-USB Cable",
+            "description": "The lifeline between your computer and most standard ESP32 development board",
+            "is_assembly_part": true
+        },
+        "resistor_220r_1k_10k": {
+            "id": "resistor_220r_1k_10k",
+            "name": "Resistor-220R/1k/10k",
+            "description": "Passive electronic components that control and limit the flow of electrical current in your circuit",
+            "is_assembly_part": true
+        },
+        "passive_buzzer": {
+            "id": "passive_buzzer",
+            "name": "Passive Buzzer",
+            "description": "A cylindrical electronic speaker that lets your ESP32 play musical notes, melodies, and multi-tone sound effects",
+            "is_assembly_part": true
+        },
+        "active_buzzer": {
+            "id": "active_buzzer",
+            "name": "Active Buzzer",
+            "description": "A self-contained electronic sounder that produces a loud, continuous fixed-frequency beep",
+            "is_assembly_part": false
+        },
+        "f_f_dupont_cable": {
+            "id": "f_f_dupont_cable",
+            "name": "F-F (Female-to-Female) DuPont Cable",
+            "description": "A jumper wire with hollow rectangular sockets (Female) on both ends",
+            "is_assembly_part": true
+        },
+        "button_switch": {
+            "id": "button_switch",
+            "name": "Button Switch",
+            "description": "A momentary mechanical switch that sends a digital signal to your ESP32 only while you are physically pressing it down",
+            "is_assembly_part": false
+        },
+        "5v_2_channel_relay_module": {
+            "id": "5v_2_channel_relay_module",
+            "name": "5V 2-Channel Relay Module",
+            "description": "An electronically controlled mechanical switch",
+            "is_assembly_part": true
+        },
+        "10k_potentiometer": {
+            "id": "10k_potentiometer",
+            "name": "Potentiometer (10K)",
+            "description": "A rotary dial, that acts as an adjustable voltage divider.",
+            "is_assembly_part": true
+        },
+        "red_led": {
+            "id": "red_led",
+            "name": "Red Light Emitting Diode",
+            "description": "A tiny solid-state light bulb that glows red when electrical current flows through it",
+            "is_assembly_part": false
+        },
+        "yellow_led": {
+            "id": "yellow_led",
+            "name": "Yellow Light Emitting Diode",
+            "description": "A tiny solid-state light bulb that glows yellow when electrical current flows through it",
+            "is_assembly_part": false
+        },
+        "green_led": {
+            "id": "green_led",
+            "name": "Green Light Emitting Diode",
+            "description": "A tiny solid-state light bulb that glows green when electrical current flows through it",
+            "is_assembly_part": false
+        },
+        "m_m_dupont_cable": {
+            "id": "m_m_dupont_cable",
+            "name": "M-M (Male-to-Male) DuPont Cable",
+            "description": "a flexible jumper wire with solid metal pins (Male) on both ends",
+            "is_assembly_part": true
+        },
+        "server_provisioning_certificate": {
+            "name": "Server Provisioning Certificate",
+            "description": "Cryptographic proof that the maze-server backend was correctly provisioned and hardened. Authorises the robot's neural link.",
+            "is_assembly_part": false
+        }
+    },
+    "server": {
+        "session": {
+            "machine": "thuas-workstation",
+            "user": "player",
+            "cwd": "/home/player",
+            "prompt_symbol": "$",
+            "connected_via_ssh": false,
+            "pending_prompt": null
+        },
+        "filesystem": {
+            "/": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "root:root"
+            },
+            "/etc": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "root:root"
+            },
+            "/etc/ssh": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "root:root"
+            },
+            "/etc/ssh/sshd_config": {
+                "type": "file",
+                "content": "PermitRootLogin yes\nPasswordAuthentication yes\nPort 22\n",
+                "perms": "600",
+                "owner": "root:root",
+                "parsed": {
+                    "PermitRootLogin": "yes",
+                    "PasswordAuthentication": "yes",
+                    "Port": 22,
+                    "syntax_valid": true
+                }
+            },
+            "/etc/hosts": {
+                "type": "file",
+                "content": "127.0.0.1\tlocalhost\n127.0.1.1\tmaze-server\n",
+                "perms": "644",
+                "owner": "root:root",
+                "parsed": {
+                    "mapped_fqdn": false
+                }
+            },
+            "/etc/netplan": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "root:root"
+            },
+            "/etc/netplan/50-cloud-init.yaml": {
+                "type": "file",
+                "content": "network:\n  version: 2\n  ethernets:\n    eth0:\n      dhcp4: true\n",
+                "perms": "644",
+                "owner": "root:root",
+                "parsed": {
+                    "static_ip_set": false,
+                    "syntax_valid": true
+                }
+            },
+            "/etc/nginx": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "root:root"
+            },
+            "/etc/nginx/sites-available": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "root:root"
+            },
+            "/etc/nginx/sites-enabled": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "root:root"
+            },
+            "/home": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "root:root"
+            },
+            "/home/player": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "player:player"
+            },
+            "/home/player/.ssh": {
+                "type": "dir",
+                "perms": "700",
+                "owner": "player:player"
+            },
+            "/home/player/.ssh/id_ed25519": {
+                "type": "file",
+                "content": "-----BEGIN OPENSSH PRIVATE KEY-----\nplayer-lab-key\n-----END OPENSSH PRIVATE KEY-----\n",
+                "perms": "600",
+                "owner": "player:player",
+                "parsed": {}
+            },
+            "/root": {
+                "type": "dir",
+                "perms": "700",
+                "owner": "root:root"
+            },
+            "/root/.ssh": {
+                "type": "dir",
+                "perms": "700",
+                "owner": "root:root"
+            },
+            "/root/.ssh/authorized_keys": {
+                "type": "file",
+                "content": "",
+                "perms": "600",
+                "owner": "root:root",
+                "parsed": {}
+            },
+            "/var": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "root:root"
+            },
+            "/var/log": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "root:root"
+            },
+            "/var/log/nginx": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "root:root"
+            },
+            "/var/log/nginx/access.log": {
+                "type": "file",
+                "content": "",
+                "perms": "644",
+                "owner": "root:root",
+                "parsed": {}
+            },
+            "/var/www": {
+                "type": "dir",
+                "perms": "755",
+                "owner": "root:root"
+            }
+        },
+        "system": {
+            "ip_address": "10.11.7.42",
+            "known_hosts": [],
+            "pkg_index_updated": false,
+            "pkg_upgraded": false,
+            "admin_user": null,
+            "users": {
+                "root": {
+                    "sudo": true,
+                    "has_ssh_key": true
+                }
+            },
+            "hostname": "maze-server",
+            "timezone": "Etc/UTC",
+            "ntp_synced": false,
+            "firewall": {
+                "active": false,
+                "default_incoming": "allow",
+                "default_outgoing": "allow",
+                "allowed_ports": []
+            },
+            "services": {
+                "sshd": {
+                    "installed": true,
+                    "running": true,
+                    "enabled": true,
+                    "port": 22
+                },
+                "nginx": {
+                    "installed": false,
+                    "running": false,
+                    "enabled": false,
+                    "port": 80
+                }
+            },
+            "health_verified": {
+                "service_status_checked": false,
+                "ports_checked": false,
+                "logs_or_http_checked": false
+            }
+        }
+    },
+    "workbench": {
+        "installed_parts": [],
+        "is_ready": false,
+        "required_parts": [
+            "obstacle_avoidance_module",
+            "f_m_dupont_cable",
+            "dht11_temperature_humidity_module",
+            "hc_sr501_pir_motion_sensor",
+            "micro_usb_cable",
+            "resistor_220r_1k_10k",
+            "passive_buzzer",
+            "f_f_dupont_cable",
+            "5v_2_channel_relay_module",
+            "10k_potentiometer",
+            "m_m_dupont_cable"
+        ]
+    },
+    "flags": {
+        "fr1_user_registered": false,
+        "tr1_desk_unlocked": false,
+        "tr2_whiteboard_inspected": false,
+        "tr4_drawer_decrypted": false,
+        "tr4_secret_key_copied": false,
+        "lab_power_on": false,
+        "lab_server_provisioned": false
+    },
+    "session": {
+        "save_version": "1.0.0",
+        "timestamp": "2026-11-14T14:03:10.415973+00:00",
+        "duration": {
+            "last_write": "2026-11-14T15:16:24.105686+00:00",
+            "value": "1:12:21",
+            "pause": true
+        },
+        "phase": "EXPLORATION",
+        "phases": {
+            "exploration": {
+                "activated": false,
+                "timestamp": null,
+                "duration": {
+                    "last_write": null,
+                    "value": "00:00:00",
+                    "pause": false
+                }
+            },
+            "assembly": {
+                "activated": false,
+                "timestamp": null,
+                "wifi_password": "Tr0janH0rse!",
+                "duration": {
+                    "last_write": null,
+                    "value": "00:00:00",
+                    "pause": false
+                }
+            },
+            "chat": {
+                "activated": false,
+                "mock": false,
+                "timestamp": null,
+                "robot": {
+                    "name": "Jarvis",
+                    "default": "Render a helpful message congratulating the user on completing the game and a welcome message(welcome to chat mode.",
+                    "history": []
+                },
+                "duration": {
+                    "last_write": null,
+                    "value": "00:00:00",
+                    "pause": false
+                }
+            }
+        }
+    },
+    "running": true,
+    "enable_colors": true,
+    "terminal_width": 146
+}

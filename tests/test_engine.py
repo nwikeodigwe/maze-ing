@@ -76,7 +76,7 @@ def test_inspect_dispatches_room_specific_targets(oop_engine, monkeypatch):
 
     oop_engine.player["current_room"] = "front_desk"
     oop_engine.inspect({"target": "receptionist"})
-    assert any("receptionist" in line.lower() for line in oop_engine.outputs)
+    assert any("register" in line.lower() for line in oop_engine.outputs)
 
     oop_engine.player["current_room"] = "teachers_room_1"
     oop_engine.inspect({"target": "desk"})
@@ -645,6 +645,39 @@ def test_lab_d2_001_guide_is_non_empty_and_complete(oop_state):
     assert "checklist" in guide
     assert "10.11.7.42" in guide
     assert "nginx" in guide
+
+
+def test_lobby_guide_introduces_the_game(oop_state):
+    guide = (oop_state.DATA_DIR / "guides" / "lobby.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert guide.strip()
+    assert "A-maze-ing Delft" in guide
+    assert "register" in guide
+    assert "maze-server" in guide
+
+
+def test_front_desk_guide_jokes_and_encourages_trying(oop_state):
+    guide = (oop_state.DATA_DIR / "guides" / "front_desk.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert guide.strip()
+    assert "register <name>" in guide
+    assert "Knock knock" in guide
+    assert "outside the box" in guide
+
+
+def test_teachers_room_4_guide_navigates_the_computer(oop_state):
+    guide = (oop_state.DATA_DIR / "guides" / "teachers_room_4.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert guide.strip()
+    assert "inspect computer" in guide
+    assert "ls -a" in guide
+    assert "super_secret_file.txt" in guide
 
 def test_inspect_server_runs_the_terminal_session(oop_engine, monkeypatch):
     oop_engine.player["current_room"] = "lab_d2_001"
