@@ -392,7 +392,8 @@ class ServerState:
             ServerStep(
                 "ssh_hardening",
                 "Harden SSH",
-                "set PermitRootLogin no and PasswordAuthentication no in /etc/ssh/sshd_config, then systemctl reload sshd",
+                "set PermitRootLogin no and PasswordAuthentication no "
+                "in /etc/ssh/sshd_config, then systemctl reload sshd",
                 sshd.get("PermitRootLogin") == "no"
                 and sshd.get("PasswordAuthentication") == "no"
                 and bool(sshd.get("syntax_valid"))

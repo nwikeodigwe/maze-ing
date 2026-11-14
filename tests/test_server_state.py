@@ -1,7 +1,5 @@
 """Tests for the server-provisioning state view."""
 
-import pytest
-
 from src.server_state import (
     ServerState,
     parse_hosts,
