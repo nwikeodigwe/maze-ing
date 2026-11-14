@@ -1218,3 +1218,319 @@ class ServerShell:
         return ShellResult(
             output="sshd: /etc/ssh/sshd_config: line 3: Bad configuration option"
         )
+
+    # -- firewall, network and time -----------------------------------------
+
+    def _cmd_ufw(self, args: list[str]) -> ShellResult:
+        """Configure the firewall."""
+        if not args:
+            return ShellResult(output="ufw: missing command")
+        firewall = self.state.system.setdefault(
+            "firewall",
+            {
+                "active": False,
+                "default_incoming": "allow",
+                "default_outgoing": "allow",
+                "allowed_ports": [],
+            },
+        )
+        allowed = firewall.setdefault("allowed_ports", [])
+        if args[0] == "default":
+            if len(args) < 3:
+                return ShellResult(output="ufw: invalid policy")
+            policy, direction = args[1], args[2]
+            if direction not in ("incoming", "outgoing"):
+                return ShellResult(output=f"ufw: invalid direction '{direction}'")
+            if policy not in ("allow", "deny"):
+                return ShellResult(output=f"ufw: invalid policy '{policy}'")
+            key = "default_incoming" if direction == "incoming" else "default_outgoing"
+            firewall[key] = policy
+            return ShellResult(output=f"Default {direction} policy changed to '{policy}'")
+        if args[0] == "allow":
+            for rule in args[1:]:
+                for port in self._rule_ports(rule):
+                    if port not in allowed:
+                        allowed.append(port)
+            return ShellResult(output="Rule added")
+        if args[0] == "enable":
+            self.state.session["pending_prompt"] = {"kind": "ufw_confirm"}
+            return ShellResult(
+                prompt=(
+                    "Command may disrupt existing ssh connections. "
+                    "Proceed with operation (y|n)? "
+                )
+            )
+        if args[0] == "status":
+            state = "active" if firewall.get("active") else "inactive"
+            return ShellResult(output=f"Status: {state}")
+        return ShellResult(output=f"ufw: invalid command '{args[0]}'")
+
+    def _rule_ports(self, rule: str) -> list[int]:
+        """Ports opened by one ``ufw allow`` rule."""
+        if rule in ("OpenSSH", "open ssh", "ssh"):
+            return [22]
+        if rule in ("Nginx Full", "nginx full"):
+            return [80, 443]
+        if rule in ("Nginx HTTP", "nginx http"):
+            return [80]
+        if rule in ("Nginx HTTPS", "nginx https"):
+            return [443]
+        text = rule.split("/")[0]
+        if text.isdigit():
+            return [int(text)]
+        return []
+
+    def _answer_ufw_confirm(self, text: str, pending: dict) -> ShellResult:
+        """Resolve the firewall activation prompt."""
+        firewall = self.state.system.get("firewall", {})
+        if text.strip().lower() not in ("y", "yes"):
+            return ShellResult(output="Command cancelled")
+        ssh_port = self.state.system.get("services", {}).get("sshd", {}).get("port", 22)
+        if ssh_port not in firewall.get("allowed_ports", []):
+            firewall["active"] = False
+            firewall["default_incoming"] = "allow"
+            firewall["default_outgoing"] = "allow"
+            session = self.state.session
+            session["machine"] = LOCAL_MACHINE
+            session["user"] = LOCAL_USER
+            session["cwd"] = f"/home/{LOCAL_USER}"
+            session["prompt_symbol"] = "$"
+            session["connected_via_ssh"] = False
+            return ShellResult(
+                output="client_loop: send disconnect: Broken pipe"
+            )
+        firewall["active"] = True
+        return ShellResult(output="Firewall is active and enabled on system startup")
+
+    def _cmd_hostnamectl(self, args: list[str]) -> ShellResult:
+        """Set the server hostname."""
+        if len(args) < 2 or args[0] != "set-hostname":
+            return ShellResult(output="usage: hostnamectl set-hostname <name>")
+        hostname = args[1]
+        self.state.system["hostname"] = hostname
+        session = self.state.session
+        session["machine"] = hostname.split(".")[0]
+        return ShellResult()
+
+    def _cmd_netplan(self, args: list[str]) -> ShellResult:
+        """Apply the network configuration."""
+        if not args or args[0] not in ("apply", "try"):
+            return ShellResult(output="usage: netplan apply")
+        parsed = self.state.filesystem.get("/etc/netplan/50-cloud-init.yaml", {}).get(
+            "parsed", {}
+        )
+        if not parsed.get("syntax_valid"):
+            return ShellResult(
+                output=(
+                    "/etc/netplan/50-cloud-init.yaml:5:7: "
+                    "Error in network definition: invalid YAML"
+                )
+            )
+        return ShellResult(output="netplan: network configuration applied")
+
+    def _cmd_timedatectl(self, args: list[str]) -> ShellResult:
+        """Set the timezone and enable network time synchronisation."""
+        if not args:
+            return ShellResult(output="usage: timedatectl set-timezone | set-ntp | status")
+        if args[0] == "set-timezone":
+            if len(args) < 2:
+                return ShellResult(output="usage: timedatectl set-timezone <zone>")
+            zone = args[1]
+            self.state.system["timezone"] = "Etc/UTC" if zone.upper() == "UTC" else zone
+            return ShellResult()
+        if args[0] == "set-ntp":
+            if len(args) < 2:
+                return ShellResult(output="usage: timedatectl set-ntp true")
+            self.state.system["ntp_synced"] = args[1].lower() in ("true", "on", "yes", "1")
+            return ShellResult()
+        if args[0] == "status":
+            synced = self.state.system.get("ntp_synced")
+            return ShellResult(
+                output=(
+                    "               Local time: Sat 2026-11-14 02:20:00 UTC\n"
+                    "           Universal time: Sat 2026-11-14 02:20:00 UTC\n"
+                    "                 RTC time: Sat 2026-11-14 02:20:00\n"
+                    "                Time zone: Etc/UTC (UTC, +0000)\n"
+                    f"    System clock synchronized: {'yes' if synced else 'no'}\n"
+                    f"              NTP service: {'active' if synced else 'inactive'}\n"
+                    "            RTC in local TZ: no"
+                )
+            )
+        return ShellResult(output=f"Unknown operation '{args[0]}'")
+
+    # -- web stack ----------------------------------------------------------
+
+    def _cmd_mkdir(self, args: list[str]) -> ShellResult:
+        """Create a directory."""
+        paths = [arg for arg in args if not arg.startswith("-")]
+        if not paths:
+            return ShellResult(output="mkdir: missing operand")
+        for raw in paths:
+            path = self._resolve(raw)
+            parts = [part for part in path.split("/") if part]
+            current = ""
+            for part in parts:
+                current = f"{current}/{part}"
+                if current not in self.state.filesystem:
+                    self.state.filesystem[current] = {
+                        "type": "dir",
+                        "perms": "755",
+                        "owner": f"{self.state.session['user']}:{self.state.session['user']}",
+                    }
+        return ShellResult()
+
+    def _cmd_chown(self, args: list[str]) -> ShellResult:
+        """Change the owner of a path."""
+        words = [arg for arg in args if not arg.startswith("-")]
+        if len(words) < 2:
+            return ShellResult(output="chown: missing operand")
+        owner, raw = words[0], words[1]
+        path = self._resolve(raw)
+        if path not in self.state.filesystem:
+            return ShellResult(
+                output=f"chown: cannot access '{raw}': No such file or directory"
+            )
+        for target in self._with_descendants(path):
+            self.state.filesystem[target]["owner"] = owner
+        return ShellResult()
+
+    def _cmd_chmod(self, args: list[str]) -> ShellResult:
+        """Change the permissions of a path."""
+        words = [arg for arg in args if not arg.startswith("-")]
+        if len(words) < 2:
+            return ShellResult(output="chmod: missing operand")
+        mode, raw = words[0], words[1]
+        path = self._resolve(raw)
+        if path not in self.state.filesystem:
+            return ShellResult(
+                output=f"chmod: cannot access '{raw}': No such file or directory"
+            )
+        for target in self._with_descendants(path):
+            self.state.filesystem[target]["perms"] = mode
+        return ShellResult()
+
+    def _with_descendants(self, path: str) -> list[str]:
+        """A path and everything below it."""
+        prefix = path if path.endswith("/") else path + "/"
+        return [
+            candidate
+            for candidate in self.state.filesystem
+            if candidate == path or candidate.startswith(prefix)
+        ]
+
+    def _cmd_cp(self, args: list[str]) -> ShellResult:
+        """Copy a file."""
+        words = [arg for arg in args if not arg.startswith("-")]
+        if len(words) < 2:
+            return ShellResult(output="cp: missing destination file operand")
+        source, destination = self._resolve(words[0]), self._resolve(words[1])
+        node = self._node(source)
+        if node is None:
+            return ShellResult(
+                output=f"cp: cannot stat '{words[0]}': No such file or directory"
+            )
+        copy = dict(node)
+        copy["owner"] = f"{self.state.session['user']}:{self.state.session['user']}"
+        self.state.filesystem[destination] = copy
+        return ShellResult()
+
+    def _cmd_ln(self, args: list[str]) -> ShellResult:
+        """Create a symbolic link."""
+        if not args or args[0] != "-s":
+            return ShellResult(output="usage: ln -s <target> <link>")
+        if len(args) < 3:
+            return ShellResult(output="ln: missing operand")
+        target, link = self._resolve(args[1]), self._resolve(args[2])
+        self.state.filesystem[link] = {"type": "link", "target": target}
+        if link.startswith("/etc/nginx/sites-enabled/"):
+            site = self.state.filesystem.get("/etc/nginx/sites-available/app")
+            if site is not None:
+                site.setdefault("parsed", {})["enabled"] = True
+        return ShellResult()
+
+    def _cmd_nginx(self, args: list[str]) -> ShellResult:
+        """Validate the nginx configuration."""
+        if "-t" not in args:
+            return ShellResult(output="usage: nginx -t")
+        site = self.state.filesystem.get("/etc/nginx/sites-available/app")
+        if site is None:
+            return ShellResult(output="nginx: [emerg] no host configuration found")
+        parsed = site.get("parsed", {})
+        if not parsed.get("syntax_valid"):
+            return ShellResult(
+                output=(
+                    'nginx: [emerg] unexpected "}" in '
+                    "/etc/nginx/sites-enabled/app:12\n"
+                    "nginx: configuration file /etc/nginx/nginx.conf test failed"
+                )
+            )
+        return ShellResult(
+            output="nginx: the configuration file /etc/nginx/nginx.conf syntax is ok"
+        )
+
+    # -- verification -------------------------------------------------------
+
+    def _cmd_ss(self, args: list[str]) -> ShellResult:
+        """List the listening sockets."""
+        services = self.state.system.get("services", {})
+        lines = []
+        for name, service in services.items():
+            if not service.get("running"):
+                continue
+            port = service.get("port", 80)
+            address = "0.0.0.0" if name == "nginx" else "0.0.0.0"
+            lines.append(
+                f"tcp   LISTEN 0      128          {address}:{port}      0.0.0.0:*  users:((\"{name}\",pid=1,fd=6))"
+            )
+        self.state.system["health_verified"]["ports_checked"] = True
+        return ShellResult(output="\n".join(lines))
+
+    _cmd_netstat = _cmd_ss
+
+    def _cmd_curl(self, args: list[str]) -> ShellResult:
+        """Fetch a URL over HTTP."""
+        url = args[-1] if args else ""
+        if "localhost" not in url:
+            return ShellResult(output=f"curl: (6) Could not resolve host: {url}")
+        webroot = self.state.filesystem.get("/var/www/maze")
+        if webroot is None:
+            return ShellResult(output="HTTP/1.1 404 Not Found")
+        if webroot.get("perms") == "700":
+            return ShellResult(output="HTTP/1.1 403 Forbidden")
+        self.state.system["health_verified"]["logs_or_http_checked"] = True
+        return ShellResult(
+            output=(
+                "HTTP/1.1 200 OK\n"
+                "Server: nginx/1.18.0 (Ubuntu)\n"
+                "Content-Type: text/html\n"
+                "\n"
+                "GET / 200"
+            )
+        )
+
+    def _cmd_tail(self, args: list[str]) -> ShellResult:
+        """Show the end of a log file."""
+        raw = args[-1] if args else ""
+        path = self._resolve(raw)
+        node = self._node(path)
+        if node is None:
+            return ShellResult(
+                output=f"tail: cannot open '{raw}' for reading: No such file or directory"
+            )
+        content = node.get("content", "")
+        if raw.endswith("access.log") and "GET /" not in content:
+            content = f"{content}127.0.0.1 - - [14/Nov/2026:02:20:00 +0000] \"GET / HTTP/1.1\" 200 612\n"
+            node["content"] = content
+        if "access.log" in raw:
+            self.state.system["health_verified"]["logs_or_http_checked"] = True
+        return ShellResult(output=content)
+
+    def _cmd_journalctl(self, args: list[str]) -> ShellResult:
+        """Show the service journal."""
+        self.state.system["health_verified"]["logs_or_http_checked"] = True
+        return ShellResult(
+            output=(
+                "Nov 14 02:20:00 maze-server systemd[1]: Started nginx.service - "
+                "A high performance web server."
+            )
+        )
