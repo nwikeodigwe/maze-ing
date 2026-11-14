@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import src.langchain as langchain
 from src.langchain import Langchain
 
 
@@ -37,14 +38,14 @@ def test_setup_providers(monkeypatch):
         ("openai", "OPENAI_API_KEY"),
     ]:
         monkeypatch.setattr(
-            Langchain.os,
+            langchain.os,
             "getenv",
             lambda key, env_key=env_key: "yes" if key == env_key else None,
         )
-        monkeypatch.setattr(Langchain, "ChatOllama", FakeProvider)
-        monkeypatch.setattr(Langchain, "ChatGroq", FakeProvider)
-        monkeypatch.setattr(Langchain, "ChatGoogleGenerativeAI", FakeProvider)
-        monkeypatch.setattr(Langchain, "ChatOpenAI", FakeProvider)
+        monkeypatch.setattr(langchain, "ChatOllama", FakeProvider)
+        monkeypatch.setattr(langchain, "ChatGroq", FakeProvider)
+        monkeypatch.setattr(langchain, "ChatGoogleGenerativeAI", FakeProvider)
+        monkeypatch.setattr(langchain, "ChatOpenAI", FakeProvider)
 
         client = Langchain(provider)
 
@@ -52,8 +53,8 @@ def test_setup_providers(monkeypatch):
 
 
 def test_setup_falls_back_to_ollama(monkeypatch):
-    monkeypatch.setattr(Langchain.os, "getenv", lambda key: None)
-    monkeypatch.setattr(Langchain, "ChatOllama", FakeProvider)
+    monkeypatch.setattr(langchain.os, "getenv", lambda key: None)
+    monkeypatch.setattr(langchain, "ChatOllama", FakeProvider)
 
     client = Langchain("gemini")
 
@@ -61,15 +62,15 @@ def test_setup_falls_back_to_ollama(monkeypatch):
 
 
 def test_setup_handles_total_failure(monkeypatch):
-    monkeypatch.setattr(Langchain.os, "getenv", lambda key: None)
+    monkeypatch.setattr(langchain.os, "getenv", lambda key: None)
 
     def fail(*args, **kwargs):
         raise RuntimeError("offline")
 
-    monkeypatch.setattr(Langchain, "ChatOllama", fail)
-    monkeypatch.setattr(Langchain, "ChatGoogleGenerativeAI", fail)
-    monkeypatch.setattr(Langchain, "ChatOpenAI", fail)
-    monkeypatch.setattr(Langchain, "ChatGroq", fail)
+    monkeypatch.setattr(langchain, "ChatOllama", fail)
+    monkeypatch.setattr(langchain, "ChatGoogleGenerativeAI", fail)
+    monkeypatch.setattr(langchain, "ChatOpenAI", fail)
+    monkeypatch.setattr(langchain, "ChatGroq", fail)
 
     client = Langchain("gemini")
 
@@ -135,7 +136,7 @@ def test_stream_uses_mock_without_model(monkeypatch):
     client.model = None
     client._history = []
     client._MAX_HISTORY = 6
-    monkeypatch.setattr(Langchain, "_mock", lambda: iter(["offline"]))
+    monkeypatch.setattr(langchain, "_mock", lambda: iter(["offline"]))
 
     assert list(client.stream("")) == ["offline"]
     assert list(client.stream("hello")) == ["offline"]

@@ -6,12 +6,16 @@ from pathlib import Path
 
 import pytest
 
-from src.rooms.lab_d2_002 import LabD2002
-from src.phase import Phase
+import src.rooms.lab_d2_002 as lab_module
+import src.phase as phase_module
 from src.engine import Engine
 from src.utils.colors import Colors
 from src.utils.shell import VirtualShell
-from state import State
+from src.utils.shell import ServerShell
+from src.state import State
+from src.server_state import ServerState
+import src.state as state_module
+from database import Database
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
@@ -156,7 +160,7 @@ def make_game_data():
 
 @pytest.fixture
 def state(tmp_path, monkeypatch):
-    monkeypatch.setattr(State, "Save", FakeSaves)
+    monkeypatch.setattr(state_module, "Save", FakeSaves)
     state = State()
     state.data = make_game_data()
     state.USER_STATE_PATH = tmp_path / "user.json"
@@ -167,11 +171,11 @@ def state(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def engine(State, monkeypatch):
-    monkeypatch.setattr(Phase, "Langchain", DummyLangchain)
-    monkeypatch.setattr(LabD2002, "Scoreboard", FakeScoreboard)
+def engine(state, monkeypatch):
+    monkeypatch.setattr(phase_module, "Langchain", DummyLangchain)
+    monkeypatch.setattr(lab_module, "Scoreboard", FakeScoreboard)
     engine = Engine(color=Colors())
-    engine.state = State
+    engine.state = state
     engine.scoreboard = FakeScoreboard()
     engine.user = FakeUser()
     engine.outputs = []
@@ -214,3 +218,29 @@ def shell():
             "var": {"log": {"nixos.log": "log"}},
         }
     )
+
+
+@pytest.fixture
+def server_shell_state():
+    """A fresh, isolated server-provisioning challenge state."""
+    return ServerState(ServerState.default())
+
+
+@pytest.fixture
+def server_shell(server_shell_state):
+    """A ServerShell bound to a fresh state, with injected I/O and editor."""
+    lines = []
+    return ServerShell(
+        server_shell_state,
+        read_line=lambda prompt="": "",
+        write=lines.append,
+        editor=lambda text: (True, text),
+    )
+
+
+@pytest.fixture
+def db(tmp_path):
+    """An isolated SQLite database with the schema applied in a temp dir."""
+    return Database(tmp_path / "game.db")
+
+
