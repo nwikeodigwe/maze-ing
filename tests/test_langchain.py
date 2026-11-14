@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.langchain as langchain_oop
+from src.langchain import Langchain
 
 
 class FakeProvider:
@@ -37,41 +37,41 @@ def test_setup_providers(monkeypatch):
         ("openai", "OPENAI_API_KEY"),
     ]:
         monkeypatch.setattr(
-            langchain_oop.os,
+            Langchain.os,
             "getenv",
             lambda key, env_key=env_key: "yes" if key == env_key else None,
         )
-        monkeypatch.setattr(langchain_oop, "ChatOllama", FakeProvider)
-        monkeypatch.setattr(langchain_oop, "ChatGroq", FakeProvider)
-        monkeypatch.setattr(langchain_oop, "ChatGoogleGenerativeAI", FakeProvider)
-        monkeypatch.setattr(langchain_oop, "ChatOpenAI", FakeProvider)
+        monkeypatch.setattr(Langchain, "ChatOllama", FakeProvider)
+        monkeypatch.setattr(Langchain, "ChatGroq", FakeProvider)
+        monkeypatch.setattr(Langchain, "ChatGoogleGenerativeAI", FakeProvider)
+        monkeypatch.setattr(Langchain, "ChatOpenAI", FakeProvider)
 
-        client = langchain_oop.Langchain(provider)
+        client = Langchain(provider)
 
         assert isinstance(client.model, FakeProvider)
 
 
 def test_setup_falls_back_to_ollama(monkeypatch):
-    monkeypatch.setattr(langchain_oop.os, "getenv", lambda key: None)
-    monkeypatch.setattr(langchain_oop, "ChatOllama", FakeProvider)
+    monkeypatch.setattr(Langchain.os, "getenv", lambda key: None)
+    monkeypatch.setattr(Langchain, "ChatOllama", FakeProvider)
 
-    client = langchain_oop.Langchain("gemini")
+    client = Langchain("gemini")
 
     assert isinstance(client.model, FakeProvider)
 
 
 def test_setup_handles_total_failure(monkeypatch):
-    monkeypatch.setattr(langchain_oop.os, "getenv", lambda key: None)
+    monkeypatch.setattr(Langchain.os, "getenv", lambda key: None)
 
     def fail(*args, **kwargs):
         raise RuntimeError("offline")
 
-    monkeypatch.setattr(langchain_oop, "ChatOllama", fail)
-    monkeypatch.setattr(langchain_oop, "ChatGoogleGenerativeAI", fail)
-    monkeypatch.setattr(langchain_oop, "ChatOpenAI", fail)
-    monkeypatch.setattr(langchain_oop, "ChatGroq", fail)
+    monkeypatch.setattr(Langchain, "ChatOllama", fail)
+    monkeypatch.setattr(Langchain, "ChatGoogleGenerativeAI", fail)
+    monkeypatch.setattr(Langchain, "ChatOpenAI", fail)
+    monkeypatch.setattr(Langchain, "ChatGroq", fail)
 
-    client = langchain_oop.Langchain("gemini")
+    client = Langchain("gemini")
 
     assert client.model is None
 
@@ -85,11 +85,11 @@ def test_setup_handles_total_failure(monkeypatch):
     ],
 )
 def test_content_to_text(content, expected):
-    assert langchain_oop.Langchain._content_to_text(content) == expected
+    assert Langchain._content_to_text(content) == expected
 
 
 def test_stream_yields_content_and_records_history(monkeypatch):
-    client = object.__new__(langchain_oop.Langchain)
+    client = object.__new__(Langchain)
     client.name = "Fred"
     client.model = object()
     client._history = []
@@ -107,7 +107,7 @@ def test_stream_yields_content_and_records_history(monkeypatch):
 
 
 def test_stream_reports_provider_error_and_keeps_partial(monkeypatch):
-    client = object.__new__(langchain_oop.Langchain)
+    client = object.__new__(Langchain)
     client.name = "Fred"
     client.model = object()
     client._history = []
@@ -130,19 +130,19 @@ def test_stream_reports_provider_error_and_keeps_partial(monkeypatch):
 
 
 def test_stream_uses_mock_without_model(monkeypatch):
-    client = object.__new__(langchain_oop.Langchain)
+    client = object.__new__(Langchain)
     client.name = "Fred"
     client.model = None
     client._history = []
     client._MAX_HISTORY = 6
-    monkeypatch.setattr(langchain_oop, "_mock", lambda: iter(["offline"]))
+    monkeypatch.setattr(Langchain, "_mock", lambda: iter(["offline"]))
 
     assert list(client.stream("")) == ["offline"]
     assert list(client.stream("hello")) == ["offline"]
 
 
 def test_respond_prints_stream(monkeypatch, capsys):
-    client = object.__new__(langchain_oop.Langchain)
+    client = object.__new__(Langchain)
     monkeypatch.setattr(client, "stream", lambda user_input: iter(["a", "b"]))
 
     client.respond("hi")

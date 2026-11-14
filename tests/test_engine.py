@@ -2,205 +2,205 @@
 
 import pytest
 
-import src.rooms.lab_d2_002 as lab_oop
-import src.rooms.teachers_room_4 as tr4_oop
-import src.room as room_oop
 
+from src.rooms.teachers_room_4 import TeachersRoomFour
+from src.rooms.lab_d2_002 import LabD2002
+from src.room import Room
 from src.rooms.front_desk import FrontDesk
 from src.rooms.teachers_room_4 import SECRET_PATH, TeachersRoomFour
 from src.utils.shell import ShellResult
 
 
-def test_inventory_empty_and_populated(oop_engine):
-    oop_engine.inventory()
-    assert any("empty" in line for line in oop_engine.outputs)
+def test_inventory_empty_and_populated(engine):
+    engine.inventory()
+    assert any("empty" in line for line in engine.outputs)
 
-    oop_engine.outputs.clear()
-    oop_engine.player["inventory"] = ["development_board", "obstacle_avoidance_module"]
-    oop_engine.inventory()
+    engine.outputs.clear()
+    engine.player["inventory"] = ["development_board", "obstacle_avoidance_module"]
+    engine.inventory()
 
-    text = "\n".join(oop_engine.outputs)
+    text = "\n".join(engine.outputs)
     assert "ESP32 Development Board" in text
     assert "Obstacle Avoidance Module" in text
     assert "1/11" in text
 
 
-def test_inventory_groups_duplicate_items(oop_engine):
-    oop_engine.player["inventory"] = [
+def test_inventory_groups_duplicate_items(engine):
+    engine.player["inventory"] = [
         "red_led", "red_led",
         "obstacle_avoidance_module", "obstacle_avoidance_module",
     ]
-    oop_engine.inventory()
+    engine.inventory()
 
-    text = "\n".join(oop_engine.outputs)
+    text = "\n".join(engine.outputs)
     assert "Red Light Emitting Diode x2" in text
     assert "Obstacle Avoidance Module x2" in text
     assert "2/11" in text
 
 
-def test_status_screen_renders(oop_engine):
-    oop_engine.flags["tr1_desk_unlocked"] = True
-    oop_engine.player["move"] = ["teachers_room_1"]
-    oop_engine.player["inventory"] = ["development_board"]
+def test_status_screen_renders(engine):
+    engine.flags["tr1_desk_unlocked"] = True
+    engine.player["move"] = ["teachers_room_1"]
+    engine.player["inventory"] = ["development_board"]
 
-    oop_engine.status()
+    engine.status()
 
-    text = "\n".join(oop_engine.outputs)
+    text = "\n".join(engine.outputs)
     assert "STATUS MENU" in text
     assert "Tester" in text
     assert "EXPLORATION" in text
     assert "desk unlocked" in text.lower()
 
 
-def test_status_inventory_groups_duplicates(oop_engine):
-    oop_engine.player["inventory"] = ["red_led", "red_led", "oled_display"]
+def test_status_inventory_groups_duplicates(engine):
+    engine.player["inventory"] = ["red_led", "red_led", "oled_display"]
 
-    oop_engine.status()
+    engine.status()
 
-    text = "\n".join(oop_engine.outputs)
+    text = "\n".join(engine.outputs)
     assert "Red Light Emitting Diode x2" in text
     assert "O.96 Inch OLED Display" in text
 
 
-def test_helper_renders_rich_menu(oop_engine, capsys):
-    oop_engine.helper()
+def test_helper_renders_rich_menu(engine, capsys):
+    engine.helper()
 
     captured = capsys.readouterr().out
-    assert "HELP MENU" in "\n".join(oop_engine.outputs)
+    assert "HELP MENU" in "\n".join(engine.outputs)
     assert "Movement" in captured
 
 
-def test_inspect_dispatches_room_specific_targets(oop_engine, monkeypatch):
-    oop_engine.inspect({"target": "terminal"})
-    assert any("Exits" in line for line in oop_engine.outputs)
+def test_inspect_dispatches_room_specific_targets(engine, monkeypatch):
+    engine.inspect({"target": "terminal"})
+    assert any("Exits" in line for line in engine.outputs)
 
-    oop_engine.player["current_room"] = "front_desk"
-    oop_engine.inspect({"target": "receptionist"})
-    assert any("register" in line.lower() for line in oop_engine.outputs)
+    engine.player["current_room"] = "front_desk"
+    engine.inspect({"target": "receptionist"})
+    assert any("register" in line.lower() for line in engine.outputs)
 
-    oop_engine.player["current_room"] = "teachers_room_1"
-    oop_engine.inspect({"target": "desk"})
-    assert any("Keypad hint" in line for line in oop_engine.outputs)
+    engine.player["current_room"] = "teachers_room_1"
+    engine.inspect({"target": "desk"})
+    assert any("Keypad hint" in line for line in engine.outputs)
 
-    oop_engine.player["current_room"] = "lab_d2_002"
-    oop_engine.inspect({"target": "workbench"})
-    assert any("WORKBENCH" in line for line in oop_engine.outputs)
+    engine.player["current_room"] = "lab_d2_002"
+    engine.inspect({"target": "workbench"})
+    assert any("WORKBENCH" in line for line in engine.outputs)
 
-    oop_engine.player["current_room"] = "teachers_room_2"
-    oop_engine.inspect({"target": "whiteboard"})
-    assert oop_engine.flags["tr2_whiteboard_inspected"] is True
+    engine.player["current_room"] = "teachers_room_2"
+    engine.inspect({"target": "whiteboard"})
+    assert engine.flags["tr2_whiteboard_inspected"] is True
 
-    oop_engine.player["current_room"] = "teachers_room_4"
-    oop_engine.inspect({"target": "note"})
-    assert any("note" in line.lower() for line in oop_engine.outputs)
+    engine.player["current_room"] = "teachers_room_4"
+    engine.inspect({"target": "note"})
+    assert any("note" in line.lower() for line in engine.outputs)
 
     called = []
-    monkeypatch.setattr(oop_engine, "inspect_computer", lambda: called.append(True))
-    oop_engine.inspect({"target": "computer"})
+    monkeypatch.setattr(engine, "inspect_computer", lambda: called.append(True))
+    engine.inspect({"target": "computer"})
     assert called == [True]
 
-    oop_engine.inspect({"target": "nothing"})
-    assert any("unavailable" in line for line in oop_engine.outputs)
+    engine.inspect({"target": "nothing"})
+    assert any("unavailable" in line for line in engine.outputs)
 
 
-def test_use_desk_code_paths(oop_engine):
-    oop_engine.player["current_room"] = "teachers_room_1"
+def test_use_desk_code_paths(engine):
+    engine.player["current_room"] = "teachers_room_1"
 
-    oop_engine.use({"target": "wrong", "indirect": "desk"})
-    assert "keycard_lvl1" not in oop_engine.player["inventory"]
+    engine.use({"target": "wrong", "indirect": "desk"})
+    assert "keycard_lvl1" not in engine.player["inventory"]
 
-    oop_engine.use({"target": "d2084", "indirect": "desk"})
-    assert "keycard_lvl1" in oop_engine.player["inventory"]
-    assert oop_engine.flags["tr1_desk_unlocked"] is True
+    engine.use({"target": "d2084", "indirect": "desk"})
+    assert "keycard_lvl1" in engine.player["inventory"]
+    assert engine.flags["tr1_desk_unlocked"] is True
 
-    oop_engine.use({"target": "d2084", "indirect": "desk"})
-    assert any("already unlocked" in line for line in oop_engine.outputs)
+    engine.use({"target": "d2084", "indirect": "desk"})
+    assert any("already unlocked" in line for line in engine.outputs)
 
-    oop_engine.use({"target": "d2084", "indirect": "door"})
-    assert any("Nothings happens" in line for line in oop_engine.outputs)
-
-
-def test_use_on_workbench_paths(oop_engine):
-    oop_engine.player["current_room"] = "lab_d2_002"
-    oop_engine.player["inventory"] = ["obstacle_avoidance_module", "development_board"]
-
-    oop_engine.use({"target": "missing", "indirect": "workbench"})
-    assert any("not a workbench component" in line for line in oop_engine.outputs)
-
-    oop_engine.use({"target": "f_m_dupont_cable", "indirect": "workbench"})
-    assert any("do not have" in line for line in oop_engine.outputs)
-
-    oop_engine.use({"target": "development_board", "indirect": "workbench"})
-    assert any("not a workbench component" in line for line in oop_engine.outputs)
-
-    oop_engine.workbench["installed_parts"] = ["obstacle_avoidance_module"]
-    oop_engine.use({"target": "obstacle_avoidance_module", "indirect": "workbench"})
-    assert any("already installed" in line for line in oop_engine.outputs)
-
-    oop_engine.workbench["installed_parts"] = []
-    oop_engine.use({"target": "obstacle_avoidance_module", "indirect": "workbench"})
-    assert "obstacle_avoidance_module" in oop_engine.workbench["installed_parts"]
-    assert "obstacle_avoidance_module" not in oop_engine.player["inventory"]
-
-    required = oop_engine.workbench["required_parts"]
-    oop_engine.workbench["installed_parts"] = required[:-1]
-    oop_engine.player["inventory"] = [required[-1]]
-    oop_engine.use({"target": required[-1], "indirect": "workbench"})
-    assert oop_engine.workbench["is_ready"] is True
-    assert oop_engine.session["phase"] == "ASSEMBLY"
+    engine.use({"target": "d2084", "indirect": "door"})
+    assert any("Nothings happens" in line for line in engine.outputs)
 
 
-def test_use_elsewhere_reports_missing_or_useless(oop_engine):
-    oop_engine.use({"target": "development_board", "indirect": "wall"})
-    assert any("do not have" in line for line in oop_engine.outputs)
+def test_use_on_workbench_paths(engine):
+    engine.player["current_room"] = "lab_d2_002"
+    engine.player["inventory"] = ["obstacle_avoidance_module", "development_board"]
 
-    oop_engine.player["inventory"] = ["development_board"]
-    oop_engine.use({"target": "development_board", "indirect": "wall"})
-    assert any("cannot use" in line for line in oop_engine.outputs)
+    engine.use({"target": "missing", "indirect": "workbench"})
+    assert any("not a workbench component" in line for line in engine.outputs)
 
+    engine.use({"target": "f_m_dupont_cable", "indirect": "workbench"})
+    assert any("do not have" in line for line in engine.outputs)
 
-def test_use_elsewhere_reports_unknown_item(oop_engine):
-    oop_engine.player["inventory"] = ["blueprint"]
+    engine.use({"target": "development_board", "indirect": "workbench"})
+    assert any("not a workbench component" in line for line in engine.outputs)
 
-    oop_engine.use({"target": "blueprint", "indirect": "wall"})
+    engine.workbench["installed_parts"] = ["obstacle_avoidance_module"]
+    engine.use({"target": "obstacle_avoidance_module", "indirect": "workbench"})
+    assert any("already installed" in line for line in engine.outputs)
 
-    assert any("cannot use" in line for line in oop_engine.outputs)
+    engine.workbench["installed_parts"] = []
+    engine.use({"target": "obstacle_avoidance_module", "indirect": "workbench"})
+    assert "obstacle_avoidance_module" in engine.workbench["installed_parts"]
+    assert "obstacle_avoidance_module" not in engine.player["inventory"]
 
-
-def test_take_and_drop(oop_engine):
-    oop_engine.take({"target": "development_board"})
-    assert "development_board" in oop_engine.player["inventory"]
-    assert "development_board" not in oop_engine.rooms["lobby"]["items"]
-
-    oop_engine.take({"target": "not_here"})
-    assert any("no 'not_here' here" in line for line in oop_engine.outputs)
-
-    oop_engine.drop({"target": "development_board"})
-    assert "development_board" in oop_engine.rooms["lobby"]["items"]
-
-    oop_engine.drop({"target": "not_an_item"})
-    assert any("no item called" in line for line in oop_engine.outputs)
-
-    oop_engine.drop({"target": "keycard_lvl1"})
-    assert any("do not have" in line for line in oop_engine.outputs)
+    required = engine.workbench["required_parts"]
+    engine.workbench["installed_parts"] = required[:-1]
+    engine.player["inventory"] = [required[-1]]
+    engine.use({"target": required[-1], "indirect": "workbench"})
+    assert engine.workbench["is_ready"] is True
+    assert engine.session["phase"] == "ASSEMBLY"
 
 
-def test_register_login_and_logout(oop_engine):
-    oop_engine.player["current_room"] = "front_desk"
+def test_use_elsewhere_reports_missing_or_useless(engine):
+    engine.use({"target": "development_board", "indirect": "wall"})
+    assert any("do not have" in line for line in engine.outputs)
 
-    oop_engine.register({"target": "alice"})
-    assert oop_engine.player["name"] == "alice"
-    assert oop_engine.player["id"] == 1
+    engine.player["inventory"] = ["development_board"]
+    engine.use({"target": "development_board", "indirect": "wall"})
+    assert any("cannot use" in line for line in engine.outputs)
 
-    oop_engine.register({"target": "alice"})
-    assert any("already taken" in line for line in oop_engine.outputs)
 
-    oop_engine.user.raise_on_create = ValueError("database down")
-    oop_engine.register({"target": "bob"})
-    assert any("database down" in line for line in oop_engine.outputs)
+def test_use_elsewhere_reports_unknown_item(engine):
+    engine.player["inventory"] = ["blueprint"]
 
-    oop_engine.player["current_room"] = "lobby"
-    oop_engine.register({"target": "carol"})
+    engine.use({"target": "blueprint", "indirect": "wall"})
+
+    assert any("cannot use" in line for line in engine.outputs)
+
+
+def test_take_and_drop(engine):
+    engine.take({"target": "development_board"})
+    assert "development_board" in engine.player["inventory"]
+    assert "development_board" not in engine.rooms["lobby"]["items"]
+
+    engine.take({"target": "not_here"})
+    assert any("no 'not_here' here" in line for line in engine.outputs)
+
+    engine.drop({"target": "development_board"})
+    assert "development_board" in engine.rooms["lobby"]["items"]
+
+    engine.drop({"target": "not_an_item"})
+    assert any("no item called" in line for line in engine.outputs)
+
+    engine.drop({"target": "keycard_lvl1"})
+    assert any("do not have" in line for line in engine.outputs)
+
+
+def test_register_login_and_logout(engine):
+    engine.player["current_room"] = "front_desk"
+
+    engine.register({"target": "alice"})
+    assert engine.player["name"] == "alice"
+    assert engine.player["id"] == 1
+
+    engine.register({"target": "alice"})
+    assert any("already taken" in line for line in engine.outputs)
+
+    engine.user.raise_on_create = ValueError("database down")
+    engine.register({"target": "bob"})
+    assert any("database down" in line for line in engine.outputs)
+
+    engine.player["current_room"] = "lobby"
+    engine.register({"target": "carol"})
     assert any("only register" in line for line in oop_engine.outputs)
 
     oop_engine.player["current_room"] = "front_desk"

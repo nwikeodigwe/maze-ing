@@ -6,14 +6,12 @@ from pathlib import Path
 
 import pytest
 
-import src.rooms.lab_d2_002 as lab_oop
-import src.phase as phase_oop
-import src.state as state_oop
-
+from src.rooms.lab_d2_002 import LabD2002
+from src.phase import Phase
 from src.engine import Engine
-from src.state import State
 from src.utils.colors import Colors
 from src.utils.shell import VirtualShell
+from state import State
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
@@ -157,8 +155,8 @@ def make_game_data():
 
 
 @pytest.fixture
-def oop_state(tmp_path, monkeypatch):
-    monkeypatch.setattr(state_oop, "Save", FakeSaves)
+def state(tmp_path, monkeypatch):
+    monkeypatch.setattr(State, "Save", FakeSaves)
     state = State()
     state.data = make_game_data()
     state.USER_STATE_PATH = tmp_path / "user.json"
@@ -169,11 +167,11 @@ def oop_state(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def oop_engine(oop_state, monkeypatch):
-    monkeypatch.setattr(phase_oop, "Langchain", DummyLangchain)
-    monkeypatch.setattr(lab_oop, "Scoreboard", FakeScoreboard)
+def engine(State, monkeypatch):
+    monkeypatch.setattr(Phase, "Langchain", DummyLangchain)
+    monkeypatch.setattr(LabD2002, "Scoreboard", FakeScoreboard)
     engine = Engine(color=Colors())
-    engine.state = oop_state
+    engine.state = State
     engine.scoreboard = FakeScoreboard()
     engine.user = FakeUser()
     engine.outputs = []
