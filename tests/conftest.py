@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import src.rooms.lab as lab_oop
+import src.rooms.lab_d2_002 as lab_oop
 import src.phase as phase_oop
 import src.state as state_oop
 
@@ -119,8 +119,9 @@ class DummyLangchain:
 def make_game_data():
     """Return a complete, isolated state payload based on the real static data."""
     data = json.loads((DATA_DIR / "default.json").read_text(encoding="utf-8"))
-    data["rooms"] = json.loads((DATA_DIR / "rooms.json").read_text(encoding="utf-8"))
-    data["items"] = json.loads((DATA_DIR / "items.json").read_text(encoding="utf-8"))
+    data["workbench"]["required_parts"] = [
+        item_id for item_id, meta in data["items"].items() if meta.get("is_assembly_part")
+    ]
     data["player"].update(
         {
             "id": 1,
