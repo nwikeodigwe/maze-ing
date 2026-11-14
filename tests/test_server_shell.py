@@ -418,3 +418,114 @@ def test_checklist_hints_the_next_incomplete_step(shell):
     output = shell.execute("checklist").output
     assert "Step 5" in output
     assert "ufw" in output
+
+def test_nano_saves_the_edited_file(shell):
+    _connected_shell(shell)
+    shell.state.set_file_content(
+        "/etc/ssh/sshd_config",
+        "PermitRootLogin yes\nPasswordAuthentication yes\nPort 22\n",
+    )
+    shell._editor = lambda text: (
+        True,
+        "PermitRootLogin no\nPasswordAuthentication no\nPort 22\n",
+    )
+
+    result = shell.execute("nano /etc/ssh/sshd_config")
+
+    assert "written" in result.output
+    parsed = shell.state.filesystem["/etc/ssh/sshd_config"]["parsed"]
+    assert parsed["PermitRootLogin"] == "no"
+    assert parsed["syntax_valid"] is True
+
+
+def test_nano_on_a_missing_file_reports_the_error(shell):
+    _connected_shell(shell)
+    result = shell.execute("nano /etc/nope/file")
+    assert "No such file or directory" in result.output
+
+
+def test_sed_edits_a_file_in_place(shell):
+    _connected_shell(shell)
+    shell.state.set_file_content(
+        "/etc/ssh/sshd_config",
+        "PermitRootLogin yes\nPasswordAuthentication yes\nPort 22\n",
+    )
+
+    shell.execute("sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config")
+
+    parsed = shell.state.filesystem["/etc/ssh/sshd_config"]["parsed"]
+    assert parsed["PermitRootLogin"] == "no"
+
+
+def test_the_challenge_can_be_completed_end_to_end(shell):
+    edits = {
+        "/etc/ssh/sshd_config": (
+            "PermitRootLogin no\nPasswordAuthentication no\nPort 22\n"
+        ),
+        "/etc/hosts": (
+            "127.0.0.1\tlocalhost\n127.0.1.1\tmaze-server.thuas.nl maze-server\n"
+        ),
+        "/etc/netplan/50-cloud-init.yaml": (
+            "network:\n  version: 2\n  ethernets:\n    eth0:\n      addresses:\n"
+            "        - 10.11.7.42/24\n      gateway4: 10.11.7.1\n"
+            "      nameservers:\n        addresses: [1.1.1.1, 8.8.8.8]\n"
+        ),
+        "/etc/nginx/sites-available/app": (
+            "server {\n  listen 80;\n  root /var/www/maze;\n}\n"
+        ),
+    }
+
+    def editor(text):
+        for path, content in edits.items():
+            if text == shell.state.filesystem.get(path, {}).get("content", text):
+                return True, content
+        return True, text
+
+    shell._editor = editor
+
+    script = [
+        "ssh -i ~/.ssh/id_ed25519 root@10.11.7.42",
+        "yes",
+        "apt update",
+        "apt upgrade -y",
+        "adduser maze-admin",
+        "secret",
+        "secret",
+        "",
+        "usermod -aG sudo maze-admin",
+        "rsync --archive --chown=maze-admin:maze-admin ~/.ssh /home/maze-admin",
+        "nano /etc/ssh/sshd_config",
+        "sshd -t",
+        "systemctl reload sshd",
+        "ufw default deny incoming",
+        "ufw default allow outgoing",
+        "ufw allow 22/tcp",
+        "ufw allow 80/tcp",
+        "ufw allow 443/tcp",
+        "ufw enable",
+        "y",
+        "hostnamectl set-hostname maze-server.thuas.nl",
+        "nano /etc/hosts",
+        "nano /etc/netplan/50-cloud-init.yaml",
+        "netplan apply",
+        "timedatectl set-timezone UTC",
+        "timedatectl set-ntp true",
+        "apt install nginx",
+        "nano /etc/nginx/sites-available/app",
+        "ln -s /etc/nginx/sites-available/app /etc/nginx/sites-enabled/app",
+        "nginx -t",
+        "mkdir -p /var/www/maze",
+        "chown -R maze-admin:www-data /var/www/maze",
+        "chmod -R 755 /var/www/maze",
+        "systemctl enable --now nginx",
+        "systemctl status nginx",
+        "ss -tulpn",
+        "curl -I http://localhost",
+    ]
+
+    for command in script:
+        shell.execute(command)
+
+    assert shell.state.session.get("pending_prompt") is None
+    assert shell.state.complete is True
+    assert [step.id for step in shell.state.steps() if not step.done] == []

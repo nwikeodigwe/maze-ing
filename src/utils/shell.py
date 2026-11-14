@@ -532,6 +532,9 @@ class ServerShell:
         "hostnamectl",
         "netplan",
         "timedatectl",
+        "nano",
+        "vim",
+        "sed",
     )
 
     def __init__(
@@ -1544,3 +1547,50 @@ class ServerShell:
             if not step.done and step.hint:
                 lines.append(f"      {step.hint}")
         return ShellResult(output="\n".join(lines))
+
+    # -- editing files ------------------------------------------------------
+
+    def _cmd_nano(self, args: list[str]) -> ShellResult:
+        """Edit a file in the modal editor."""
+        paths = [arg for arg in args if not arg.startswith("-")]
+        if not paths:
+            return ShellResult(output="usage: nano <file>")
+        raw = paths[0]
+        path = self._resolve(raw)
+        node = self._node(path)
+        if node is None:
+            parent = path.rsplit("/", 1)[0] or "/"
+            if parent not in self.state.filesystem:
+                return ShellResult(output=f"nano: {raw}: No such file or directory")
+            content = ""
+        else:
+            content = node.get("content", "")
+        saved, text = self._editor(content)
+        if saved:
+            self.state.set_file_content(path, text)
+            return ShellResult(output=f"'{raw}' written")
+        return ShellResult(output=f"'{raw}' unchanged")
+
+    _cmd_vim = _cmd_nano
+
+    def _cmd_sed(self, args: list[str]) -> ShellResult:
+        """Edit a file in place with a substitution."""
+        if "-i" not in args:
+            return ShellResult(output="usage: sed -i 's/old/new/' <file>")
+        words = [arg for arg in args if arg != "-i"]
+        if len(words) < 2:
+            return ShellResult(output="sed: no file specified")
+        expression, raw = words[0], words[1]
+        if not (expression.startswith("s/") and expression.endswith("/")):
+            return ShellResult(output=f"sed: unsupported expression '{expression}'")
+        body = expression[2:-1]
+        if "/" not in body:
+            return ShellResult(output=f"sed: unsupported expression '{expression}'")
+        old, new = body.split("/", 1)
+        path = self._resolve(raw)
+        node = self._node(path)
+        if node is None:
+            return ShellResult(output=f"sed: can't read {raw}: No such file or directory")
+        content = node.get("content", "")
+        self.state.set_file_content(path, content.replace(old, new))
+        return ShellResult()

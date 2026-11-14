@@ -1,7 +1,7 @@
 """Lobby room.
 
 No lobby-specific logic is needed beyond the terminal interaction; its data
-lives in ``data/rooms.json``.
+lives in ``data/default.json``.
 """
 from src.assets.logo import logo
 from src.room import Room
