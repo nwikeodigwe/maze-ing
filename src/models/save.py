@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 from database import Database
@@ -34,8 +35,8 @@ class SaveQuery:
         return [dict(row) for row in rows]
 
 class Save(Database):
-    def __init__(self, data: dict | None = None) -> None:
-        super().__init__()
+    def __init__(self, data: dict | None = None, path: Path | None = None) -> None:
+        super().__init__(path)
         self.user = data if data else {}
 
     def create(self,  slot: str,  user_id: int | None = None,) -> int | None:
