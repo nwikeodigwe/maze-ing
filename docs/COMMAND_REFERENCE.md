@@ -86,8 +86,15 @@ persisted with the game, so the challenge can be left and resumed.
 | `ss -tulpn`                 | `netstat -tulpn`                 | `ss -tulpn`                            | Lists the listening sockets.                                                 |
 | `curl -I <url>`             | `tail -n 20 <log>`, `journalctl -u <unit>` | `curl -I http://localhost`   | Checks the service over HTTP or in its logs.                                  |
 | `checklist`                 | —                               | `checklist`                            | Shows the eleven provisioning steps and how many are done.                     |
+| `help [<name>]`             | `help ssh`, `help ufw`           | `help ufw`                             | Summarises the mission and every command group; with a name, shows one command's usage. |
 | `ls`, `cd`, `pwd`, `cat`    | `ls -a`, `ls -l`                 | `cat /etc/ssh/sshd_config`             | Browse and read the server filesystem.                                       |
 | `exit`                      | —                               | `exit`                                 | Leaves the server, or the terminal when already on the workstation.           |
+
+The terminal's `help` opens with the mission ("Provision the maze-server..."),
+your current machine and the next expected step, then a grouped command list
+with `help <name>` for per-command usage. The room's own `inspect guide`
+interactable reads `data/guides/lab_d2_001.txt`, a full walkthrough of the
+eleven steps and the challenge's two traps.
 
 The challenge is complete when all eleven steps pass; the game then sets
 `lab_server_provisioned` and awards the *Server Provisioning Certificate*, which is
