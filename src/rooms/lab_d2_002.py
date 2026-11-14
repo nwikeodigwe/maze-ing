@@ -15,11 +15,8 @@ BASE_SCORE = 1000
 EXPLORATION_POINTS_PER_MINUTE = 12
 ASSEMBLY_POINTS_PER_MINUTE = 4
 
-<<<<<<<< HEAD:src/rooms/lab.py
-class Lab(Room):
-========
+
 class LabD2002(Room):
->>>>>>>> 0cf63c936f8a566f8cf5b3ac3ec52fdcb23745a8:src/rooms/lab_d2_002.py
     def __init__(self) -> None:
         super().__init__()
         self.scoreboard = Scoreboard()

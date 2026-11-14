@@ -7,8 +7,8 @@ This manual lists all supported commands, shortcuts, directional aliases, and ph
 The engine normalizes all user input before passing it to `src/parser.py`:
 
 - **Case-Insensitive:** `GO <ROOM>`, `Go <Room>`, and `go <north>` are treated identically.
-- **Trimmed Whitespace:** Leading, trailing, and duplicate spaces are stripped (`take   battery_pack` → `take battery_pack`).
-- **Noise Word Stripping:** Articles like `the`, `a`, and `an` are ignored (`take the battery_pack` → `take battery_pack`).
+- **Trimmed Whitespace:** Leading, trailing, and duplicate spaces are stripped (`take   red_led` → `take red_led`).
+- **Noise Word Stripping:** Articles like `the`, `a`, and `an` are ignored (`take the red_led` → `take red_led`).
 
 ## 2. Exploration Phase Commands
 
@@ -25,15 +25,15 @@ During EXPLORATION mode, player commands follow a `VERB [TARGET]` or `VERB [ITEM
 | Command Syntax     | Aliases / Shortcuts                                   | Example                                | Target Action / Result                                              |
 | ------------------ | ----------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------- |
 | `look`             | `l`, `ls`, `examine room`                             | `look`                                 | Displays current room title, description, visible items, and exits. |
-| `inspect [target]` | `examine [target]`, `read [target]`, `check [target]` | `inspect desk`, `inspect battery_pack` | Inspects a room object or item.                                     |
+| `inspect [target]` | `examine [target]`, `read [target]`, `check [target]` | `inspect desk`, `inspect red_led` | Inspects a room object or item.                                     |
 
 ### Inventory Management
 
 | Command Syntax | Aliases / Shortcuts                           | Example             | Target Action / Result                                                    |
 | -------------- | --------------------------------------------- | ------------------- | ------------------------------------------------------------------------- |
 | `inventory`    | `inv`, `i`                                    | `inventory`         | Lists all items currently held in player inventory.                       |
-| `take [item]`  | `get [item]`, `grab [item]`, `pick up [item]` | `take battery_pack` | Transfers an item from the current room floor into player inventory.      |
-| `drop [item]`  | `discard [item]`                              | `drop battery_pack` | Transfers an item from player inventory back onto the current room floor. |
+| `take [item]`  | `get [item]`, `grab [item]`, `pick up [item]` | `take red_led` | Transfers an item from the current room floor into player inventory.      |
+| `drop [item]`  | `discard [item]`                              | `drop red_led` | Transfers an item from player inventory back onto the current room floor. |
 
 ### Interactions & Puzzles
 
@@ -102,11 +102,11 @@ required before the robot can be activated.
 
 ## 4. Assembly Phase Commands
 
-When all 7 required components are placed on the workbench in `lab_d2001`, `game_phase` transitions to `"ASSEMBLY"`.
+When all 11 required components are installed on the workbench in `lab_d2_002`, `session["phase"]` transitions to `"ASSEMBLY"`.
 
 | Command Syntax      | Aliases / Shortcuts         | Example             | Target Action / Result                                              |
 | ------------------- | --------------------------- | ------------------- | ------------------------------------------------------------------- |
-| `activate`          | `power on`, `start`, `boot` | `activate`          | Triggers boot sequence animation and transitions game to CHAT_MODE. |
+| `activate`          | `power on`, `start`, `boot` | `activate`          | Triggers boot sequence animation and transitions game to CHAT. |
 | `inspect workbench` | `check workbench`           | `inspect workbench` | Displays list of installed hardware parts vs. missing components.   |
 | `look`              | `l`, `ls`                   | `look`              | Re-renders terminal header and workbench state.                     |
 
@@ -119,7 +119,7 @@ Once `activate` is executed, standard command verbs are bypassed. All user input
 ### Input Handling Pipeline
 
 ```text
-Player Input -> src/client.py -> OpenAI Chat Completions API -> Streaming Response
+Player Input -> src/langchain.py -> Configured AI Provider (ollama/groq/gemini/openai) -> Streaming Response
 ```
 
 ## 6. Parser Error & Feedback Matrix
@@ -127,7 +127,7 @@ Player Input -> src/client.py -> OpenAI Chat Completions API -> Streaming Respon
 | Scenario / Error Condition | Parser / Engine Output                                                          |
 | -------------------------- | ------------------------------------------------------------------------------- |
 | Unknown Command            | `I don't understand that command. Type 'help' for a list of available actions.` |
-| Missing Target Parameter   | `What do you want to [verb]? (e.g., '[verb] battery_pack')`                     |
+| Missing Target Parameter   | `What do you want to [verb]? (e.g., '[verb] red_led')`                     |
 | Item Not in Room           | `There is no '[item]' here.`                                                    |
 | Item Not in Inventory      | `You are not carrying '[item]'.`                                                |
 | Target Door Locked         | `The door is locked. Access requires: Level-1 Staff Keycard.`                   |
