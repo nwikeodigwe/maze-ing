@@ -1534,3 +1534,13 @@ class ServerShell:
                 "A high performance web server."
             )
         )
+
+    def _cmd_checklist(self, args: list[str]) -> ShellResult:
+        """Print the provisioning steps and how far the player has got."""
+        lines = []
+        for number, step in enumerate(self.state.steps(), start=1):
+            mark = "[x]" if step.done else "[ ]"
+            lines.append(f"{mark} Step {number} - {step.title}")
+            if not step.done and step.hint:
+                lines.append(f"      {step.hint}")
+        return ShellResult(output="\n".join(lines))
