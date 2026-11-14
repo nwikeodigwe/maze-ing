@@ -189,6 +189,7 @@ class TeachersRoomFour(Room):
             None.
         """
         try:
+            self.session["duration"]["pause"] = True
             loader(
                 loading_time=1.2,
                 label="Booting up the computer...",

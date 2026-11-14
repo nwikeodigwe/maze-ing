@@ -646,6 +646,13 @@ def test_inspect_server_runs_the_terminal_session(oop_engine, monkeypatch):
     # The terminal session is not charged to the player, and the clock resumes.
     assert oop_engine.session["duration"]["value"] == "0:05:00"
     assert oop_engine.session["duration"]["pause"] is False
+    # The session is persisted, so leaving the lab cannot lose progress.
+    import json
+
+    payload = json.loads(
+        oop_engine.state.USER_STATE_PATH.read_text(encoding="utf-8")
+    )
+    assert payload["server"]["session"]["cwd"] == "/etc"
 
 def test_award_sets_the_flag_and_grants_the_certificate(oop_engine):
     oop_engine._award_provisioning_certificate()
@@ -684,3 +691,22 @@ def test_activate_refuses_until_the_server_is_provisioned(oop_engine, monkeypatc
 
     assert oop_engine.session["phase"] == "EXPLORATION"
     assert any("provisioned" in line for line in oop_engine.outputs)
+
+def test_teachers_room_four_terminal_does_not_charge_the_clock(oop_state, monkeypatch):
+    room = TeachersRoomFour()
+    room.state = oop_state
+    oop_state.session["duration"]["value"] = "0:05:00"
+
+    class NoopConsole:
+        def print(self, *args, **kwargs):
+            pass
+
+    monkeypatch.setattr(tr4_oop, "console", NoopConsole())
+    monkeypatch.setattr(tr4_oop.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(tr4_oop, "loader", lambda **kwargs: None)
+    monkeypatch.setattr(room, "run_shell", lambda shell: None)
+
+    room.inspect_computer()
+
+    assert oop_state.session["duration"]["value"] == "0:05:00"
+    assert oop_state.session["duration"]["pause"] is False

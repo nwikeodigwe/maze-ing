@@ -102,7 +102,7 @@ def parse_hosts(content: str, hostname: str) -> dict[str, Any]:
         if not line:
             continue
         fields = line.split()
-        if len(fields) >= 2 and fields[0] == "127.0.1.1" and hostname in fields[1:]:
+        if len(fields) >= 2 and hostname in fields[1:]:
             mapped = True
     return {"mapped_fqdn": mapped}
 
@@ -339,7 +339,7 @@ class ServerState:
     def _parse(self, path: str, content: str) -> dict[str, Any]:
         """Derive the structured fields for one file's text."""
         if path == "/etc/hosts":
-            return parse_hosts(content, self.system.get("hostname", SERVER_FQDN))
+            return parse_hosts(content, SERVER_FQDN)
         if path == "/etc/netplan/50-cloud-init.yaml":
             return parse_netplan(content, self.system.get("ip_address", SERVER_IP))
         if path == "/etc/nginx/sites-available/app":
@@ -350,7 +350,6 @@ class ServerState:
     def steps(self) -> list[ServerStep]:
         """Return the eleven provisioning steps and their completion state."""
         system = self.system
-        session = self.session
         filesystem = self.filesystem
         sshd = filesystem.get("/etc/ssh/sshd_config", {}).get("parsed", {})
         hosts = filesystem.get("/etc/hosts", {}).get("parsed", {})
@@ -372,8 +371,7 @@ class ServerState:
                 "ssh",
                 "Connect to the server",
                 f"ssh -i ~/.ssh/id_ed25519 root@{SERVER_IP}",
-                bool(session.get("connected_via_ssh"))
-                and SERVER_IP in system.get("known_hosts", []),
+                SERVER_IP in system.get("known_hosts", []),
             ),
             ServerStep(
                 "packages",
@@ -431,8 +429,11 @@ class ServerState:
                 bool(nginx_service.get("installed"))
                 and bool(site.get("configured"))
                 and bool(site.get("syntax_valid"))
-                and bool(site.get("enabled"))
-                and "/etc/nginx/sites-enabled/app" in filesystem,
+                and "/etc/nginx/sites-enabled/app" in filesystem
+                and filesystem.get("/etc/nginx/sites-enabled/app", {}).get(
+                    "type"
+                )
+                == "link",
             ),
             ServerStep(
                 "permissions",

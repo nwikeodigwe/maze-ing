@@ -75,6 +75,10 @@ class ModalEditor:
         while True:
             self._render()
             key = self._read_key()
+            if not key:
+                # End of input (EOF or a closed pipe): discard and stop, so a
+                # broken reader cannot spin forever.
+                return False, self._original
             if key == KEY_CTRL_S:
                 return True, self.text()
             if key in (KEY_CTRL_X, KEY_ESC):
