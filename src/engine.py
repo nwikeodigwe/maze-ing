@@ -220,17 +220,18 @@ class Engine(Phase, FrontDesk, Lobby, LabD2001, LabD2002, TeachersRoomOne, Teach
         if item not in room_data["items"]:
             self.render(text=self.colorize(f"There is no '{name}' here.", color_code=self.color.RED))
             return None
-        if current_room == "store":
-            self.render(
-                text=self.colorize(
-                    "You can only drop items in here", color_code=self.color.RED
-                )
-            )
-            return None
-        if len(self.state.player["inventory"]) >= 11:
+        if len(self.state.player["inventory"]) >= self.state.inventory_capacity:
             self.render(
                 text=self.colorize(
                     "Unfortunately you can't fit in anymore items in your inventory",
+                    color_code=self.color.RED,
+                )
+            )
+            return None
+        if current_room == "store" and len(self.state.rooms["store"]["items"]) <= 2:
+            self.render(
+                text=self.colorize(
+                    "You can only exchange items in this room.",
                     color_code=self.color.RED,
                 )
             )

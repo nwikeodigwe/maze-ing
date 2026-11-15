@@ -4,7 +4,7 @@
 .ruff_cache/
 *.pyc
 .coverage/*
-data/saves/*
+/data/saves/*
 data/user.json
 docs/superpowers/*
 .superpowers

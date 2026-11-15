@@ -36,6 +36,7 @@ class State:
         "running",
         "enable_colors",
         "terminal_width",
+        "inventory_capacity"
     )
 
     def __init__(self, colors: Colors | None = None) -> None:
@@ -143,6 +144,14 @@ class State:
     def enable_colors(self, value: bool) -> None:
         self.data["enable_colors"] = bool(value)
 
+    @property
+    def inventory_capacity(self) -> int:
+        return int(self.data.get("inventory_capacity", 11))
+
+    @inventory_capacity.setter
+    def inventory_capacity(self, value: int) -> None:
+        self.data["inventory_capacity"] = int(value)
+
     # -- setup ------------------------------------------------------------
     def __setup(self) -> None:
         # 1. Create the live autosave from the template if it is missing/empty.
@@ -152,6 +161,8 @@ class State:
 
         # 2. Load the mutable state and merge in the static data files.
         self.data = json.loads(self.USER_STATE_PATH.read_text(encoding="utf-8"))
+        if not self.data["session"]["timestamp"]:
+            self.data["session"]["timestamp"] = datetime.now(timezone.utc).isoformat()
         self.__load_static()
 
         self.help_commands[:] = json.loads(
