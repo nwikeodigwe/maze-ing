@@ -174,7 +174,6 @@ class Alias:
         # Inventory
         "inventory": "inventory",
         "inv": "inventory",
-        "i": "inventory",
 
         # System & Game Flow
         "help": "help",
