@@ -654,7 +654,7 @@ def test_lobby_guide_introduces_the_game(state):
     )
 
     assert guide.strip()
-    assert "A-maze-ing Delft" in guide
+    assert "THUAS" in guide
     assert "register" in guide
     assert "maze-server" in guide
 
@@ -666,7 +666,8 @@ def test_front_desk_guide_jokes_and_encourages_trying(state):
 
     assert guide.strip()
     assert "register <name>" in guide
-    assert "Knock knock" in guide
+    assert "login <name>" in guide
+    assert "Knock, knock" in guide
     assert "outside the box" in guide
 
 
@@ -678,7 +679,8 @@ def test_teachers_room_4_guide_navigates_the_computer(state):
     assert guide.strip()
     assert "inspect computer" in guide
     assert "ls -a" in guide
-    assert "super_secret_file.txt" in guide
+    assert "cd <folder>" in guide
+    assert "cat <file>" in guide
 
 def test_inspect_server_runs_the_terminal_session(engine, monkeypatch):
     engine.player["current_room"] = "lab_d2_001"
