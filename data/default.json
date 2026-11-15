@@ -2,6 +2,7 @@
     "running": true,
     "enable_colors": true,
     "terminal_width": 146,
+    "inventory_capacity": 11,
     "player": {
         "id": null,
         "name": null,
@@ -27,7 +28,7 @@
         "lobby": {
             "id": "lobby",
             "name": "Lobby",
-            "description": "The main-floor lobby, anchored by a flickering terminal that has been running since orientation and refuses to die. Hallways branch off in every direction; good luck keeping them straight.",
+            "description": "The main-floor lobby, anchored by a flickering terminal that has been running since orientation and refuses to die.\nHallways branch off in every direction; good luck keeping them straight.",
             "restricted": false,
             "requires": [],
             "exits": {
@@ -50,7 +51,7 @@
         "front_desk": {
             "id": "front_desk",
             "name": "Front Desk",
-            "description": "The front desk, where a receptionist greets you with the warm smile of someone who has fielded this same question seventeen times today. Register here; she insists.",
+            "description": "The front desk, where a receptionist greets you with the warm smile of someone who has fielded this same question\nseventeen times today. Register here; she insists.",
             "restricted": false,
             "requires": [],
             "exits": {
@@ -67,7 +68,7 @@
         "classroom_d2_015": {
             "id": "classroom_d2_015",
             "name": "Classroom D2 015",
-            "description": "A lecture hall its students fled, leaving loose papers scattered like a frustrated god of half-finished group projects. The projector may or may not be cursed.",
+            "description": "A lecture hall its students fled, leaving loose papers scattered like a frustrated god of half-finished group\nprojects. The projector may or may not be cursed.",
             "restricted": true,
             "requires": [
                 "development_board"
@@ -85,7 +86,7 @@
         "teachers_room_1": {
             "id": "teachers_room_1",
             "name": "Teachers Room 1",
-            "description": "A teachers' office buried under filing cabinets, every drawer a tiny monument to paperwork. There is a desk here, and that desk is very, very locked.",
+            "description": "A teachers' office buried under filing cabinets, every drawer a tiny monument to paperwork. There is a desk here,\nand that desk is very, very locked.",
             "restricted": false,
             "requires": [],
             "exits": {
@@ -108,7 +109,7 @@
         "classroom_d2_035": {
             "id": "classroom_d2_035",
             "name": "Classroom D2 035",
-            "description": "A lab room with presentation workstations bolted so firmly to the tables that even the most determined student gave up. The screens still glow with last week's slides.",
+            "description": "A lab room with presentation workstations bolted so firmly to the tables that even the most determined student gave up.\nThe screens still glow with last week's slides.",
             "restricted": false,
             "requires": [],
             "exits": {
@@ -124,7 +125,7 @@
         "project_room_1": {
             "id": "project_room_1",
             "name": "Project Room 1",
-            "description": "A hardware testing bay that smells faintly of solder, ambition and regret. Yesterday's prototypes are taped together here under the patient hum of a power supply.",
+            "description": "A hardware testing bay that smells faintly of solder, ambition and regret. Yesterday's prototypes are taped together here\nunder the patient hum of a power supply.",
             "restricted": true,
             "requires": [
                 "keycard_lvl1"
@@ -141,7 +142,7 @@
         "east_corridor": {
             "id": "east_corridor",
             "name": "East Corridor",
-            "description": "A long corridor that echoes like a cave and hums in one fluorescent monotone. The exit sign flickers in a way that is either reassuring or a warning - hard to say.",
+            "description": "A long corridor that echoes like a cave and hums in one fluorescent monotone. The exit sign flickers in a way that is either\nreassuring or a warning - hard to say.",
             "restricted": false,
             "requires": [],
             "exits": {
@@ -159,7 +160,7 @@
         "store": {
             "id": "store",
             "name": "Store",
-            "description": "The supply store - a parts cage ruled by a clerk with excellent posture and low tolerance for 'just borrowing'. Admire the stock, leave your spares at the deposit tray, touch nothing.",
+            "description": "The supply store - a parts cage ruled by a clerk with excellent posture and low tolerance for 'just borrowing'. Admire the stock,\nleave your spares at the deposit tray, touch nothing.",
             "restricted": false,
             "requires": [],
             "exits": {
@@ -176,7 +177,7 @@
         "teachers_room_2": {
             "id": "teachers_room_2",
             "name": "Teachers Room 2",
-            "description": "An administrative office dominated by a whiteboard covered in a diagram only one long-retired person understood. It has stayed up 'for reference' for years now.",
+            "description": "An administrative office dominated by a whiteboard covered in a diagram only one long-retired person understood. It has stayed up\n'for reference' for years now.",
             "restricted": null,
             "requires": [],
             "exits": {
@@ -195,7 +196,7 @@
         "project_room_2": {
             "id": "project_room_2",
             "name": "Project Room 2",
-            "description": "A robotics testing arena where component crates wait like sleepy gladiators, and the floor wears the scuffs of a hundred robots that briefly believed in themselves.",
+            "description": "A robotics testing arena where component crates wait like sleepy gladiators, and the floor wears the scuffs of a hundred robots that\nbriefly believed in themselves.",
             "restricted": false,
             "requires": [],
             "exits": {
@@ -211,7 +212,7 @@
         "teachers_room_4": {
             "id": "teachers_room_4",
             "name": "Teacher Room 4",
-            "description": "The senior faculty office, where the papers on the desk are arranged for maximum scholarly authority and minimum actual filing. A NixOS machine in the corner has clearly seen things.",
+            "description": "The senior faculty office, where the papers on the desk are arranged for maximum scholarly authority and minimum actual filing.\nA NixOS machine in the corner has clearly seen things.",
             "restricted": true,
             "requires": [
                 "keycard_lvl1"
@@ -232,7 +233,7 @@
         "lab_d2_001": {
             "id": "lab_d2_001",
             "name": "Lab D 2001",
-            "description": "Lab D 2001 - server room and the beating mechanical heart of the whole operation. The maze-server hums in its rack, waiting for someone to make it usable. That someone is you.",
+            "description": "Lab D 2001 - server room and the beating mechanical heart of the whole operation. The maze-server hums in its rack, waiting for\nsomeone to make it usable. That someone is you.",
             "restricted": false,
             "requires": [],
             "exits": {
@@ -251,7 +252,7 @@
         "lab_d2_002": {
             "id": "lab_d2_002",
             "name": "Lab D2 002",
-            "description": "Lab D2 002 - the assembly lab, built around an industrial workbench with a storied past. Feed it every part it asks for and it may just cough up a robot.",
+            "description": "Lab D2 002 - the assembly lab, built around an industrial workbench with a storied past. Feed it every part it asks for and it\nmay just cough up a robot.",
             "restricted": false,
             "requires": [],
             "exits": {
