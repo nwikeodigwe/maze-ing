@@ -1,5 +1,9 @@
 You are in Lab D 2001, the server room where the maze-server lives.
 
+If you have made it this far then I admire your dedication.
+
+This is the moment you have been waiting for.
+
 The maze-server is the backend that powers the robot's neural link.
 Until it is provisioned, the robot cannot be activated at the workbench,
 no matter how many parts you have assembled.
@@ -91,5 +95,7 @@ WHEN YOU ARE DONE
 The lab awards the Server Provisioning Certificate and puts the robot
 on standby. Your progress is saved, so you can leave and return to the
 terminal without losing any work.
+
+Also worrthy of not. some of the configuration require a complete re-write
 
 Good luck!
