@@ -1,40 +1,52 @@
-Welcome to the front desk. The friendliest place in the building, give
-or take the fluorescent lighting and a receptionist who has already
-forgotten your name. She's lovely. It's just been a long semester.
+Welcome to the THUAS front desk! ✨ Fancy, huh? Yeah, I know, we spared no expense.
+Anyway, without further ado, let’s get right into it.
 
-WHAT TO DO RIGHT NOW
-Type this, with your own name instead of <name>:
+📋 WHAT TO DO RIGHT NOW
+First things first: make it official.
+Type this (swapping <name> for your actual name, obviously):
 
-    register <name>
+register <name>
 
-You can't save your game until you've registered, and I really don't
-want to be the one who says "just reload" and then watches you lose an
-hour of wandering. Save early. Save often. Save before you touch the
-mysterious button. There is always a mysterious button.
+Already been here before? Welcome back, legend. Log in with:
 
-A JOKE, BECAUSE THE SESSION RUNS ON CAFFEINE
+login <name>
 
-Knock knock.
-Who's there?
-Register.
-Register who?
-Register <name>, fast, before the funding runs out again.
+And yes, you guessed it—leaving is also an option:
 
-ON DOING IT "WRONG"
-Here's what the in-game help won't tell you: you cannot break this game
-by typing the wrong command. Truly. Try `go ceiling`. Try `use
-spaghetti on door`. Try `enter 1234`. The worst that happens is the game
-shrugs and says it doesn't understand, and you walk away knowing one
-more thing that isn't the answer - which is, let's be honest, about 90%
-of puzzle solving.
+logout
 
-Half of what's hidden in this building is behind the thing you were too
-polite to try. The people who built this place built secrets into it
-expecting you to be a little unhinged. So be a little unhinged. Think
-outside the box. Type the thing nobody else would type.
+Here’s the catch: you can’t save your game unless you register.
+...SIKE! 😜 Your progress saves automatically by default.
+What I meant is you won't get dedicated save slots without an account.
 
-WHEN YOU'RE READY
-`look` around. `go east` back to the lobby. Type `inspect guide` in any
-room for the local gossip and `help` for every verb the game knows.
+Honestly, I'm already dropping way too many pro-tips here. Half the fun
+is messing around to see what actually works, so knock yourself out.
 
-Now go on. The receptionist is watching. Make it weird.
+I’ll stop rambling in a second, I promise—just read the rest of this first.
+Actually, before I shut up, here’s a quick joke powered entirely by my current
+caffeine intake ☕:
+
+    Knock, knock.
+    Who's there?
+    Register.
+    Register who?
+    REGISTER YOUR NAME!! 📣
+
+Sorry for yelling. Just trying to emphasize the point. If you ever want your name
+immortalized in the THUAS Virtual Hall of Fame 🏆, I strongly suggest you do it.
+
+🍝 ON DOING IT "WRONG"
+Here’s a secret the normal help menu won’t tell you: you cannot break this game by
+typing the wrong command. Seriously, try it. Type go ceiling. Type use spaghetti on
+door. Type enter 1234.
+
+The absolute worst thing that happens is the game shrugs, tells you it has no idea
+what you're talking about, and you walk away knowing one more thing that doesn't
+work—which is, let’s be real, 90% of puzzle solving anyway. 🧩
+
+Half the secrets in this building are locked behind actions you were too polite to try.
+The people who built this place designed it expecting you to be a little unhinged.
+So embrace the chaos. Think outside the box. Type the weird stuff nobody else would think to type.
+
+
+Now go on. Do what you have to. Make it weird. ✌️
