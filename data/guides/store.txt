@@ -1,41 +1,41 @@
-Adjust your expectations before you try to loot this room:
-you can’t just take everything because you feel like it. Sometimes
-you have to give back, give it your all, give it your love... Oh wait,
-that is not what I meant to say, though I'm sure you see where I'm
-going with this. 🫶
+# Adjust your expectations before you try to loot this room:
+# you can’t just take everything because you feel like it. Sometimes
+# you have to give back, give it your all, give it your love... Oh wait,
+# that is not what I meant to say, though I'm sure you see where I'm
+# going with this. 🫶
 
-I thought it would be really cool to have one room that’s completely
-different from the rest—to really drive home my point about standing
-out and being unique. Looking back on it now? Might have been a terrible
-idea. 🤷‍♂️
+# I thought it would be really cool to have one room that’s completely
+# different from the rest—to really drive home my point about standing
+# out and being unique. Looking back on it now? Might have been a terrible
+# idea. 🤷‍♂️
 
-Anyway, hand over all your money! 💰 I mean, hand over all your items
-(please don't)—or at least spare a few, because I can tell your inventory
-is about to give out any second now. 🎒💥
+# Anyway, hand over all your money! 💰 I mean, hand over all your items
+# (please don't)—or at least spare a few, because I can tell your inventory
+# is about to give out any second now. 🎒💥
 
-Not sure what command to use? Try:
+# Not sure what command to use? Try:
 
-    drop <item>
+#    drop <item>
 
-🤫 A LITTLE CONFESSION
-This might come as a shock, but I’ve been meaning to tell you this for a while:
-there are plenty of hidden sudo and alias commands tucked into this game.
+# 🤫 A LITTLE CONFESSION
+# This might come as a shock, but I’ve been meaning to tell you this for a while:
+# there are plenty of hidden sudo and alias commands tucked into this game.
 
-Why didn't I add them to the help menu, you ask? Honestly, I kind of enjoy
-these little conversations we have going on. So let's keep it going. 😉
+# Why didn't I add them to the help menu, you ask? Honestly, I kind of enjoy
+# these little conversations we have going on. So let's keep it going. 😉
 
-⚠️ DON'T SOFT-LOCK YOURSELF
-Just be careful not to drop anything you actually need to build the
+# ⚠️ DON'T SOFT-LOCK YOURSELF
+# Just be careful not to drop anything you actually need to build the
 robot or unlock other rooms:
 
-Assembly items: Easy to spot—they have a green assembly tag right next to them. 🟢
+# Assembly items: Easy to spot—they have a green assembly tag right next to them. 🟢
 
-Room-access items: Well, you might just have to roll the dice on that one! 🎲
+# Room-access items: Well, you might just have to roll the dice on that one! 🎲
 
-If you do accidentally ruin everything and get stuck, you can always start fresh with:
+# If you do accidentally ruin everything and get stuck, you can always start fresh with:
 
-    restart 🔄
+#     restart 🔄
 
-I know, I know—terrible game design. Look, I don't make the rules... SIKE, I literally do! 😅
+# I know, I know—terrible game design. Look, I don't make the rules... SIKE, I literally do! 😅
 
-Now beat it! ✌️
+# Now beat it! ✌️

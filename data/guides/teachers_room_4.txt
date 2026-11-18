@@ -1,40 +1,40 @@
-🪴 TEACHER ROOM 4 — The Senior Faculty Office
+# 🪴 TEACHER ROOM 4 — The Senior Faculty Office
 
-Welcome to the corner office. There are papers everywhere,
-three very dead plants, and a computer that looks like it
-holds classified opinions about the curriculum. Whatever you do,
-don't touch the papers—some of them are already graded. 😬
+# Welcome to the corner office. There are papers everywhere,
+# three very dead plants, and a computer that looks like it
+# holds classified opinions about the curriculum. Whatever you do,
+# don't touch the papers—some of them are already graded. 😬
 
-Your real target is that computer. It runs NixOS (a flavor of Linux),
-which means everything lives inside a "filesystem" that you explore
-using typed commands. Yes, it's a text adventure inside a text adventure.
-We’re going full Inception here—hold on to something. 🌀
+# Your real target is that computer. It runs NixOS (a flavor of Linux),
+# which means everything lives inside a "filesystem" that you explore
+# using typed commands. Yes, it's a text adventure inside a text adventure.
+# We’re going full Inception here—hold on to something. 🌀
 
-🔌 STEP ONE: TURN IT ON
-    inspect computer
+#🔌 STEP ONE: TURN IT ON
+#     inspect computer
 
-It’ll whir to life, spit out a boot sequence that briefly makes you
-nervous, flash a logo, and drop you at a prompt reading teacher@teacher-pc.
-Boom—you're in. 💻 (Type help at any time if you need the full command list.)
+# It’ll whir to life, spit out a boot sequence that briefly makes you
+# nervous, flash a logo, and drop you at a prompt reading teacher@teacher-pc.
+# Boom—you're in. 💻 (Type help at any time if you need the full command list.)
 
-⌨️ THE COMPUTER COMMANDS
+# ⌨️ THE COMPUTER COMMANDS
 
-    ls             list what's in the folder you're currently standing in. 📂
-    ls -a          same thing, except it also reveals hidden dot-files. 🕵️‍♂️
-    cd <folder>    step into a folder (e.g., cd Documents).
-    cd ..          step back up one folder. 🔙
-    pwd            "where am I?" — prints your current folder path.
-    cat <file>     print a file's contents (e.g., cat README.txt). 📄
-    find           hunt through every single folder for files.
-    tree           draw the whole folder tree so you can see the layout. 🌲
-    exit           log off the machine when you're done.
+#     ls             list what's in the folder you're currently standing in. 📂
+#     ls -a          same thing, except it also reveals hidden dot-files. 🕵️‍♂️
+#     cd <folder>    step into a folder (e.g., cd Documents).
+#     cd ..          step back up one folder. 🔙
+#     pwd            "where am I?" — prints your current folder path.
+#     cat <file>     print a file's contents (e.g., cat README.txt). 📄
+#     find           hunt through every single folder for files.
+#     tree           draw the whole folder tree so you can see the layout. 🌲
+#     exit           log off the machine when you're done.
 
-🔍 THE ACTUAL MYSTERY
-The teacher hid "the schematic" somewhere on this machine. That note on
-the desk—the one reading "its super secret", grammar left exactly as
-found—points straight here. There’s also a README file on the computer
-that basically snitches on itself: not every file shows up in a regular ls.
+# 🔍 THE ACTUAL MYSTERY
+# The teacher hid "the schematic" somewhere on this machine. That note on
+# the desk—the one reading "its super secret", grammar left exactly as
+# found—points straight here. There’s also a README file on the computer
+# that basically snitches on itself: not every file shows up in a regular ls.
 
-That's the whole trick! Linux hides things by starting their name with a
-full stop (a "dot"), and plain old ls politely pretends dot-files don't
-exist. 🙈 So the secret is just sitting in a hidden folder, one tiny flag away:
+# That's the whole trick! Linux hides things by starting their name with a
+# full stop (a "dot"), and plain old ls politely pretends dot-files don't
+# exist. 🙈 So the secret is just sitting in a hidden folder, one tiny flag away:
