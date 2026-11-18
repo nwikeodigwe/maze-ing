@@ -1,30 +1,34 @@
-Welcome to the THUAS front desk! ✨ Fancy, huh? Yeah, I know, we spared no expense.
-Anyway, without further ado, let’s get right into it.
+# Welcome to the THUAS front desk! ✨ Fancy, huh? Yeah, I know, # we spared no expense.
+# Anyway, without further ado, let’s get right into it.
 
-📋 WHAT TO DO RIGHT NOW
-First things first: make it official.
-Type this (swapping <name> for your actual name, obviously):
+# 📋 WHAT TO DO RIGHT NOW
+# First things first: make it official.
+# Type this (swapping <name> for your actual name, obviously):
 
-register <name>
+    register <name>
 
-Already been here before? Welcome back, legend. Log in with:
+# Already been here before? Welcome back, legend. Log in with:
 
-login <name>
+# login <name>
 
-And yes, you guessed it—leaving is also an option:
+# And yes, you guessed it—leaving is also an option:
 
-logout
+    logout
 
-Here’s the catch: you can’t save your game unless you register.
-...SIKE! 😜 Your progress saves automatically by default.
-What I meant is you won't get dedicated save slots without an account.
+# Here’s the catch: you can’t save your game unless you 
+# register.
+# ...SIKE! 😜 Your progress saves automatically by default.
+# What I meant is you won't get dedicated save slots without an # account.
 
-Honestly, I'm already dropping way too many pro-tips here. Half the fun
-is messing around to see what actually works, so knock yourself out.
+# Honestly, I'm already dropping way too many pro-tips here. 
+# Half the fun
+# is messing around to see what actually works, so knock 
+# yourself out.
 
-I’ll stop rambling in a second, I promise—just read the rest of this first.
-Actually, before I shut up, here’s a quick joke powered entirely by my current
-caffeine intake ☕:
+# I’ll stop rambling in a second, I promise—just read the rest # of this first.
+# Actually, before I shut up, here’s a quick joke powered 
+# entirely by my current
+# caffeine intake ☕:
 
     Knock, knock.
     Who's there?
@@ -32,21 +36,24 @@ caffeine intake ☕:
     Register who?
     REGISTER YOUR NAME!! 📣
 
-Sorry for yelling. Just trying to emphasize the point. If you ever want your name
-immortalized in the THUAS Virtual Hall of Fame 🏆, I strongly suggest you do it.
+# Sorry for yelling. Just trying to emphasize the point. If you # ever want your name
+# immortalized in the THUAS Virtual Hall of Fame 🏆, I strongly # suggest you do it.
 
-🍝 ON DOING IT "WRONG"
-Here’s a secret the normal help menu won’t tell you: you cannot break this game by
-typing the wrong command. Seriously, try it. Type go ceiling. Type use spaghetti on
-door. Type enter 1234.
+# 🍝 ON DOING IT "WRONG"
+# Here’s a secret the normal help menu won’t tell you: you 
+# cannot break this game by
+# typing the wrong command. Seriously, try it. Type go ceiling. # Type use spaghetti on
+# door. Type enter 1234.
 
-The absolute worst thing that happens is the game shrugs, tells you it has no idea
-what you're talking about, and you walk away knowing one more thing that doesn't
-work—which is, let’s be real, 90% of puzzle solving anyway. 🧩
+# The absolute worst thing that happens is the game shrugs, 
+# tells you it has no idea
+# what you're talking about, and you walk away knowing one more # thing that doesn't
+# work—which is, let’s be real, 90% of puzzle solving anyway. 🧩
 
-Half the secrets in this building are locked behind actions you were too polite to try.
-The people who built this place designed it expecting you to be a little unhinged.
-So embrace the chaos. Think outside the box. Type the weird stuff nobody else would think to type.
+# Half the secrets in this building are locked behind actions 
+# you were too polite to try.
+# The people who built this place designed it expecting you to # be a little unhinged.
+# So embrace the chaos. Think outside the box. Type the weird # stuff nobody else would think to type.
 
 
-Now go on. Do what you have to. Make it weird. ✌️
+# Now go on. Do what you have to. Make it weird. ✌️
