@@ -1,12 +1,13 @@
-# You are in Lab D 2001, the server room where the maze-server # lives.
+# You are in Lab D 2001, the server room where the maze-server 
+# lives.
 
 # If you have made it this far then I admire your dedication.
 
 # This is the moment you have been waiting for.
 
-# The maze-server is the backend that powers the robot's neural # link.
-# Until it is provisioned, the robot cannot be activated at the # workbench,
-# no matter how many parts you have assembled.
+# The maze-server is the backend that powers the robot's neural 
+# link. Until it is provisioned, the robot cannot be activated at the 
+# workbench, no matter how many parts you have assembled.
 
 # TAKE THE FIRST STEP
 # Open the server terminal, then work through all 11 steps
@@ -87,8 +88,10 @@
 
 # WARNINGS
 # 1. Allow the SSH port BEFORE enabling the firewall. Running
-#   `ufw enable` without `ufw allow 22/tcp` severs your session #   and rolls the firewall back to the workstation.
-# 2. After Steps 3 and 4, root login is disabled.Reconnect      #   with your
+#   `ufw enable` without `ufw allow 22/tcp` severs your session 
+#    and rolls the firewall back to the workstation.
+# 2. After Steps 3 and 4, root login is disabled.Reconnect     
+#    with your
    admin account instead of root:
      ssh -i ~/.ssh/id_ed25519 maze-admin@10.11.7.42
 

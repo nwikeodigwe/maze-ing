@@ -2,10 +2,10 @@
 
 # Anyways
 
-# Let’s get the awkward part out of the way first: this is one # of those
-# text adventures where you type things—commands like look and # go east.
-# If you're under thirty, just think of it as a very slow video # game.
-# If you're over thirty, welcome home. 🕹️
+# Let’s get the awkward part out of the way first: this is one 
+# of those text adventures where you type things—commands like 
+# look and go east. If you're under thirty, just think of it as
+# a very slow video # game. If you're over thirty, welcome home. 🕹️
 
 # You're a student at THUAS (The Hague University of Applied 
 # Sciences), and somebody has to build a robot. That somebody 
@@ -19,7 +19,8 @@
 
 # 🤖 YOUR MISSION (IT SOUNDS SIMPLE):
 
-#    Wander the building and pocket every part and secret you   #    find.
+#    Wander the building and pocket every part and secret you   
+#    find.
 
 #    Assemble it all at the workbench in the lab. 🔧
 
